@@ -14,6 +14,12 @@ WareBot AI provides a software-based warehouse intelligence system that uses rob
 
 ---
 
+## 🚀 Live Demo
+
+[![Open WareBot AI](https://img.shields.io/badge/Live-Demo-brightgreen)](https://warebot-ai-dhfbewwp9mxitlvs72ydgh.streamlit.app/)
+
+👉 **Live App:** https://warebot-ai-dhfbewwp9mxitlvs72ydgh.streamlit.app/
+
 ## 🚀 Key Features
 
 ### 🛰️ Fleet Monitoring
