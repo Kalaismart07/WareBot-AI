@@ -17,21 +17,26 @@ WareBot AI provides a software-based warehouse intelligence system that uses rob
 ## 🚀 Key Features
 
 ### 🛰️ Fleet Monitoring
+
 - Real-time robot telemetry monitoring
 - Battery monitoring
 - Motor current monitoring
 - Temperature and vibration tracking
 - Navigation error monitoring
 - Robot health status
+- Fleet-wide robot status overview
 
 ### 🛠️ Predictive Maintenance
+
 - Robot anomaly detection
 - Maintenance risk identification
 - Robot health scoring
 - Critical robot identification
 - Telemetry-based maintenance insights
+- Battery degradation forecasting
 
 ### 🗺️ Route Optimization
+
 - Warehouse grid simulation
 - Obstacle-aware path planning
 - Dynamic robot task allocation
@@ -40,15 +45,83 @@ WareBot AI provides a software-based warehouse intelligence system that uses rob
 - Optimized path generation
 
 ### 📦 Warehouse Management
+
 - Inventory monitoring
 - Product stock levels
 - Reorder-level tracking
 - Active order monitoring
-- Order priority and status
+- Order priority tracking
+- Order status monitoring
 
 ### 🤖 AI Operations Assistant
+
 - Robot health queries
 - Maintenance status queries
+- Anomaly information
+- Fleet status assistance
+- Operational insights
+
+---
+
+## 📊 Dashboard Modules
+
+The WareBot AI dashboard provides a centralized warehouse operations view with the following modules.
+
+### 🛰️ Fleet Intelligence
+
+- Total fleet monitoring
+- Healthy robot count
+- Robot attention status
+- Anomaly count
+- Low-stock indicators
+- Robot health distribution
+- Individual robot battery performance
+- Robot telemetry visibility
+
+### 🛠️ Predictive Maintenance
+
+- Robot maintenance risk
+- Anomaly detection results
+- Robot health indicators
+- Maintenance attention alerts
+- Telemetry-based risk analysis
+- Critical robot identification
+
+### 🗺️ Warehouse Digital Twin
+
+- Live warehouse grid
+- Robot positions
+- Warehouse stations
+- Warehouse obstacles
+- Obstacle-aware navigation
+- AI task allocation
+- Recommended robot selection
+- Target station selection
+- Route distance
+- Optimized path
+
+### 🚦 Congestion Intelligence
+
+- Robot traffic by station
+- Station utilization
+- Congestion monitoring
+- Warehouse flow visibility
+- Station activity analysis
+
+### 📦 Warehouse Management
+
+- Inventory table
+- Product stock levels
+- Reorder levels
+- Active orders
+- Order quantity
+- Order priority
+- Order status
+
+### 🤖 Ops Assistant
+
+- Robot health queries
+- Maintenance queries
 - Anomaly information
 - Fleet status assistance
 
@@ -91,12 +164,4 @@ Data Processing
               │               │               │
               └───────────────┼───────────────┘
                               ▼
-                    Streamlit Dashboard
-
-                    ---
-
-## 🖥️ Dashboard Preview
-
-![WareBot AI Dashboard](screenshots/dashboard.png)
-
----
+                     Streamlit Dashboard
