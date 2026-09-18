@@ -166,7 +166,11 @@ Data Processing
                               ▼
                      Streamlit Dashboard
 
----## 📸 Dashboard Preview
+---
+
+---
+
+##📸 Dashboard Preview
 
 ![WareBot AI Dashboard](screenshots/dashboard.png)
 
