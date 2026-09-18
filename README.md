@@ -165,7 +165,7 @@ Data Processing
               └───────────────┼───────────────┘
                               ▼
                      Streamlit Dashboard
-'''
+```
 
 ---
 
