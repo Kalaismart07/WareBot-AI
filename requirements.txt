@@ -1,10 +1,5 @@
 streamlit
-fastapi
-uvicorn
 pandas
 numpy
 scikit-learn
-xgboost
-shap
-tensorflow
 plotly
