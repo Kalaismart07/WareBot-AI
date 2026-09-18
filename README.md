@@ -92,3 +92,11 @@ Data Processing
               └───────────────┼───────────────┘
                               ▼
                     Streamlit Dashboard
+
+                    ---
+
+## 🖥️ Dashboard Preview
+
+![WareBot AI Dashboard](screenshots/dashboard.png)
+
+---
