@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score
 
 
@@ -158,11 +158,15 @@ def train_maintenance_model(df):
     X = df[features]
     y = df["maintenance_risk"]
 
-    model = RandomForestClassifier(
-        n_estimators=150,
-        random_state=42,
-        class_weight="balanced"
-    )
+    model = XGBClassifier(
+    n_estimators=150,
+    max_depth=5,
+    learning_rate=0.05,
+    subsample=0.9,
+    colsample_bytree=0.9,
+    random_state=42,
+    eval_metric="logloss"
+)
 
     model.fit(X, y)
 

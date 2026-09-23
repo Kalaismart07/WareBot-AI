@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import requests
 
 from ml_models import (
     generate_telemetry,
@@ -2155,87 +2156,129 @@ if active_page in ("All Details", "Route Optimization"):
 
 
     # ============================================================
-    # AI TASK ALLOCATION
-    # ============================================================
+# AI TASK ALLOCATION — LIVE MQTT + RL + DIJKSTRA
+# ============================================================
 
-    with task_col:
+with task_col:
 
-        with st.container(border=True):
+    with st.container(border=True):
 
-            st.markdown(
-                "#### AI Task Allocation"
-            )
+        st.markdown(
+            "#### AI Task Allocation"
+        )
 
+        st.caption(
+            "Live MQTT telemetry → Q-Learning → Dijkstra"
+        )
 
-            robot_options = [
+        target = st.selectbox(
+            "Target Station",
+            ["P1", "P2", "P3"],
+            key="rl_target_station"
+        )
 
-                {
-                    "robot_id": "R01",
-                    "position": (0, 0),
-                    "battery": 85,
-                    "maintenance_risk": 0,
-                },
+        if st.button(
+            "⚡ Run AI Allocation",
+            width="stretch"
+        ):
 
-                {
-                    "robot_id": "R02",
-                    "position": (4, 2),
-                    "battery": 72,
-                    "maintenance_risk": 0,
-                },
+            try:
 
-                {
-                    "robot_id": "R03",
-                    "position": (8, 4),
-                    "battery": 55,
-                    "maintenance_risk": 1,
-                },
-
-                {
-                    "robot_id": "R04",
-                    "position": (9, 0),
-                    "battery": 91,
-                    "maintenance_risk": 0,
-                }
-
-            ]
-
-
-            target = st.selectbox(
-                "Target Station",
-                list(STATIONS.keys())
-            )
-
-
-            selected = allocate_task(
-                robot_options,
-                target
-            )
-
-
-            if selected:
-
-                st.metric(
-                    "Recommended Robot",
-                    selected["robot_id"]
+                response = requests.get(
+                    "http://127.0.0.1:8000/mqtt/allocate-task",
+                    timeout=10
                 )
 
-                st.metric(
-                    "Route Distance",
-                    f"{selected['distance']} steps"
+                if response.status_code == 200:
+
+                    result = response.json()
+
+                    allocation = result.get(
+                        "allocation"
+                    )
+
+                    route = result.get(
+                        "route_optimization"
+                    )
+
+                    if allocation and route:
+
+                        a1, a2 = st.columns(2)
+
+                        with a1:
+                            st.metric(
+                                "Recommended Robot",
+                                allocation.get(
+                                    "robot_id",
+                                    "-"
+                                )
+                            )
+
+                        with a2:
+                            st.metric(
+                                "Route Distance",
+                                f"{route.get('distance', 0)} steps"
+                            )
+
+                        a3, a4 = st.columns(2)
+
+                        with a3:
+                            st.metric(
+                                "Health Score",
+                                allocation.get(
+                                    "health_score",
+                                    0
+                                )
+                            )
+
+                        with a4:
+                            st.metric(
+                                "Maintenance Risk",
+                                allocation.get(
+                                    "maintenance_risk",
+                                    0
+                                )
+                            )
+
+                        st.success(
+                            f"RL selected "
+                            f"{allocation['robot_id']} "
+                            f"for {route['station']}"
+                        )
+
+                        st.markdown(
+                            "##### Optimized Dijkstra Path"
+                        )
+
+                        st.code(
+                            str(route.get("path", [])),
+                            language="text"
+                        )
+
+                    else:
+
+                        st.warning(
+                            "No robot allocation available."
+                        )
+
+                else:
+
+                    st.error(
+                        f"Backend returned "
+                        f"HTTP {response.status_code}"
+                    )
+
+            except requests.exceptions.ConnectionError:
+
+                st.error(
+                    "FastAPI backend is not running. "
+                    "Start uvicorn first."
                 )
 
-                st.metric(
-                    "Optimization Score",
-                    selected["score"]
-                )
+            except Exception as e:
 
-                st.markdown(
-                    "##### Optimized Path"
-                )
-
-                st.code(
-                    str(selected["path"]),
-                    language="text"
+                st.error(
+                    f"AI allocation error: {e}"
                 )
 
 

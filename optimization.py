@@ -260,3 +260,63 @@ if __name__ == "__main__":
     else:
 
         print("\nNo valid route found.")
+
+        # ============================================================
+# 7. RL ROBOT + DIJKSTRA ROUTE INTEGRATION
+# ============================================================
+
+def optimize_rl_robot(robot, station):
+    """
+    Takes the robot selected by the RL task allocator
+    and calculates its optimal warehouse route using Dijkstra.
+    """
+
+    if not robot:
+        return {
+            "status": "No robot selected",
+            "route": []
+        }
+
+    robot_id = robot.get("robot_id")
+
+    # Use robot position if available.
+    # Otherwise use a safe default warehouse position.
+    position = robot.get(
+        "position",
+        (0, 0)
+    )
+
+    if isinstance(position, list):
+        position = tuple(position)
+
+    if station not in STATIONS:
+        return {
+            "status": "Invalid station",
+            "station": station,
+            "route": []
+        }
+
+    target = STATIONS[station]
+
+    path = shortest_path(
+        position,
+        target
+    )
+
+    if not path:
+        return {
+            "status": "No valid route found",
+            "robot_id": robot_id,
+            "station": station,
+            "route": []
+        }
+
+    distance = len(path) - 1
+
+    return {
+        "status": "Route optimized",
+        "robot_id": robot_id,
+        "station": station,
+        "distance": distance,
+        "path": path
+    }
