@@ -8,4 +8,4 @@ shap
 requests
 fastapi
 uvicorn
-paho-mqttgit 
+paho-mqtt
