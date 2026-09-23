@@ -2185,7 +2185,7 @@ with task_col:
             try:
 
                 response = requests.get(
-                    "http://127.0.0.1:8000/mqtt/allocate-task",
+                    "https://warebot-ai.onrender.com/mqtt/allocate-task",
                     timeout=10
                 )
 
