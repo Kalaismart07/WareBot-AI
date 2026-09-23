@@ -1941,9 +1941,8 @@ if active_page in ("All Details", "Route Optimization"):
     st.divider()
 
 
-    map_col, task_col = st.columns(
-        [2.2, 1]
-    )
+    map_col, task_col = st.columns([2.2, 1]
+)
 
 
     # ============================================================
@@ -2156,14 +2155,14 @@ if active_page in ("All Details", "Route Optimization"):
 
 
     # ============================================================
-# AI TASK ALLOCATION — LIVE MQTT + RL + DIJKSTRA
-# ============================================================
+    # AI TASK ALLOCATION — LIVE MQTT + RL + DIJKSTRA
+    # ============================================================
 
-with task_col:
+    with task_col:
 
-    with st.container(border=True):
+        with st.container(border=True):
 
-        st.markdown(
+            st.markdown(
             "#### AI Task Allocation"
         )
 
