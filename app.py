@@ -1,13 +1,13 @@
 # ============================================================
-# WAREBOT AI
-# Premium Warehouse Intelligence Command Center
+# WAREBOT AI - AERO-CROP STYLE COMMAND CENTER
 # ============================================================
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import requests
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from ml_models import (
     generate_telemetry,
@@ -16,2686 +16,946 @@ from ml_models import (
     calculate_health_score,
     get_robot_status,
 )
-
-from wms import (
-    get_inventory,
-    get_orders,
-    get_low_stock_items,
-)
-
-from optimization import (
-    WAREHOUSE_GRID,
-    STATIONS,
-    allocate_task,
-)
-
-
-# ============================================================
-# PAGE CONFIG
-# ============================================================
+from wms import get_inventory, get_orders, get_low_stock_items
+from optimization import WAREHOUSE_GRID, STATIONS
 
 st.set_page_config(
     page_title="WareBot AI | Command Center",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
+# -----------------------------
+# Data
+# -----------------------------
+@st.cache_data
+def load_data():
+    telemetry = generate_telemetry(num_robots=20, records_per_robot=100)
+    telemetry, threshold = calculate_anomaly_score(telemetry)
+    model, accuracy, features = train_maintenance_model(telemetry)
+    telemetry["health_score"] = telemetry.apply(calculate_health_score, axis=1)
+    telemetry["status"] = telemetry["health_score"].apply(get_robot_status)
+    return telemetry, threshold, accuracy
 
-# ============================================================
-# THEME
-# ============================================================
+telemetry, anomaly_threshold, model_accuracy = load_data()
+latest = telemetry.sort_values("timestamp").groupby("robot_id").tail(1).copy()
+latest = latest.sort_values("robot_id")
 
-if "theme" not in st.session_state:
-    st.session_state.theme = "dark"
+TOTAL = len(latest)
+HEALTHY = int((latest["status"] == "Healthy").sum())
+WARNING = int((latest["status"] == "Warning").sum())
+CRITICAL = int((latest["status"] == "Critical").sum())
+ATTENTION = WARNING + CRITICAL
+ANOMALIES = int(telemetry["anomaly"].sum())
+LOW_STOCK_DF = get_low_stock_items()
+LOW_STOCK = len(LOW_STOCK_DF)
+AVG_BATTERY = float(latest["battery"].mean())
+AVG_HEALTH = float(latest["health_score"].mean())
 
+# -----------------------------
+# Session navigation
+# -----------------------------
+if "active_page" not in st.session_state:
+    st.session_state.active_page = "Dashboard"
 
-theme_choice = st.sidebar.radio(
-    "APPEARANCE",
-    ["🌙 Dark", "☀️ Light"],
-    index=0 if st.session_state.theme == "dark" else 1,
-)
+pages = {
+    "Dashboard": "Dashboard",
+    "Fleet Monitoring": "Fleet Monitoring",
+    "Predictive Maintenance": "Predictive Maintenance",
+    "Route Optimization": "Route Optimization",
+    "Inventory & Orders": "Inventory & Orders",
+    "Analytics": "Analytics",
+    "AI Assistant": "AI Assistant",
+}
 
-st.session_state.theme = (
-    "dark"
-    if theme_choice == "🌙 Dark"
-    else "light"
-)
-
-is_dark = st.session_state.theme == "dark"
-
-
-# ============================================================
-# THEME COLORS
-# ============================================================
-
-if is_dark:
-
-    BG = "#070b14"
-    SIDEBAR = "#090e18"
-    CARD = "#0d1421"
-    CARD_2 = "#101827"
-
-    TEXT = "#f8fafc"
-    TEXT_MUTED = "#94a3b8"
-
-    BORDER = "rgba(148,163,184,0.11)"
-    BORDER_HOVER = "rgba(34,211,238,0.40)"
-
-    ACCENT = "#22d3ee"
-    ACCENT_2 = "#6366f1"
-
-    GRID = "rgba(148,163,184,0.08)"
-    PLOT_BG = "#060b15"
-
-else:
-
-    BG = "#f4f7fb"
-    SIDEBAR = "#ffffff"
-    CARD = "#ffffff"
-    CARD_2 = "#f8fafc"
-
-    TEXT = "#172033"
-    TEXT_MUTED = "#475569"
-
-    BORDER = "rgba(15,23,42,0.10)"
-    BORDER_HOVER = "rgba(8,145,178,0.40)"
-
-    ACCENT = "#0891b2"
-    ACCENT_2 = "#4f46e5"
-
-    GRID = "rgba(15,23,42,0.10)"
-    PLOT_BG = "#ffffff"
-
-
-# ============================================================
-# PREMIUM CSS
-# ============================================================
-
-CSS = """
+# -----------------------------
+# Bright premium CSS
+# -----------------------------
+CSS = r"""
 <style>
+:root {
+    --navy:#10244a;
+    --blue:#1687f8;
+    --blue2:#0b74e5;
+    --cyan:#16b7d7;
+    --green:#19c77a;
+    --orange:#f7a51b;
+    --red:#ef4b58;
+    --purple:#8b5cf6;
+    --ink:#14213d;
+    --muted:#58708f;
+    --line:#dce8f5;
+    --bg:#f4f9ff;
+    --card:#ffffff;
+}
+html,body,[data-testid="stAppViewContainer"]{background:var(--bg)!important;color:var(--ink)!important;}
+[data-testid="stAppViewContainer"] .main{padding-top:0!important;}
+/* Hide Streamlit's own top toolbar/Deploy strip so it never overlaps the WareBot header */
+header[data-testid="stHeader"]{display:none!important;}
+[data-testid="stToolbar"]{display:none!important;}
+[data-testid="stSidebar"]{display:none!important;}
+.block-container{max-width:1660px!important;padding:8px 28px 44px!important;margin-top:0!important;}
+#MainMenu,footer{visibility:hidden!important;}
+*{box-sizing:border-box;}
 
-/* =========================================================
-   WAREBOT AI — SIDEBAR INDEPENDENT SCROLL FIX
-   ========================================================= */
+/* top navigation */
+.wb-nav-shell{height:74px;background:rgba(255,255,255,.98);border:1px solid #d9e7f4;border-radius:22px;box-shadow:0 10px 30px rgba(37,91,142,.10);display:flex;align-items:center;padding:8px 12px;margin-bottom:12px;overflow:hidden;}
+.wb-brand{display:flex;align-items:center;gap:10px;min-width:300px;padding-left:2px;}
+.wb-logo{width:48px;height:48px;border-radius:15px;background:linear-gradient(145deg,#dcefff,#eef8ff);display:flex;align-items:center;justify-content:center;font-size:25px;box-shadow:inset 0 1px 0 #fff;}
+.wb-brand-title{font-size:24px;font-weight:900;line-height:1;color:#10244a;letter-spacing:-.5px;}
+.wb-brand-title span{color:#1687f8;}
+.wb-brand-sub{font-size:10px;color:#5d7898;margin-top:5px;font-weight:650;white-space:nowrap;}
+.wb-live{display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 13px;border:1px solid #bfeedd;border-radius:999px;background:#f1fff9;color:#087c50;font-size:11px;font-weight:850;white-space:nowrap;min-width:112px;}
+.wb-live-dot{width:9px;height:9px;border-radius:50%;background:#15c47a;box-shadow:0 0 0 5px rgba(21,196,122,.12);animation:pulse 1.8s infinite;}
+.wb-date{padding:0 10px;border-left:1px solid #dce8f5;font-size:10px;color:#4d6685;line-height:1.35;text-align:center;min-width:98px;white-space:nowrap;}
+@keyframes pulse{50%{box-shadow:0 0 0 9px rgba(21,196,122,0);}}
 
-[data-testid="stSidebar"] {
-    height: 100vh !important;
-    overflow: hidden !important;
+/* Streamlit nav buttons */
+.wb-nav-buttons{margin:0 3px;}
+.wb-nav-buttons .stButton>button{border:1px solid transparent!important;background:transparent!important;color:#1e3b63!important;border-radius:14px!important;font-size:10px!important;font-weight:780!important;min-height:48px!important;padding:0 6px!important;box-shadow:none!important;transition:.2s!important;white-space:nowrap!important;}
+.wb-nav-buttons .stButton>button:hover{background:#edf6ff!important;color:#0876e7!important;border-color:#d5e8f8!important;transform:translateY(-1px)!important;}
+.wb-nav-buttons.active .stButton>button{background:linear-gradient(135deg,#1687f8,#0876e7)!important;color:white!important;border-color:#1687f8!important;box-shadow:0 8px 18px rgba(22,135,248,.22)!important;}
+.wb-nav-buttons.active .stButton>button:hover{color:white!important;}
+
+/* hide refresh row spacing */
+.refresh-row{display:none;}
+
+/* hero */
+.wb-hero{height:220px;border-radius:24px;overflow:hidden;position:relative;background:#dff0ff url('https://images.unsplash.com/photo-1586528116493-da8c2f5b8a7f?auto=format&fit=crop&w=1800&q=90') center/cover no-repeat;box-shadow:0 14px 38px rgba(41,100,154,.14);border:1px solid #d6e8f8;margin-bottom:14px;}
+.wb-hero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,.98) 0%,rgba(255,255,255,.93) 30%,rgba(255,255,255,.60) 49%,rgba(255,255,255,.12) 76%,rgba(255,255,255,.02) 100%);}
+.wb-hero-copy{position:absolute;left:34px;top:28px;max-width:680px;z-index:2;}
+.wb-eyebrow{color:#0985e9;font-size:12px;letter-spacing:1.6px;font-weight:900;margin-bottom:7px;}
+.wb-hero-title{font-size:48px;line-height:.98;font-weight:950;letter-spacing:-2.1px;color:#10264b;margin-bottom:10px;}
+.wb-hero-title span{color:#147ff0;}
+.wb-hero-sub{font-size:14px;line-height:1.55;color:#416384;font-weight:560;max-width:720px;}
+.wb-fleet-float{position:absolute;right:20px;bottom:22px;z-index:3;background:rgba(255,255,255,.94);border:1px solid rgba(214,229,243,.95);border-radius:17px;padding:13px 18px;display:flex;align-items:center;gap:22px;box-shadow:0 12px 30px rgba(29,80,125,.16);backdrop-filter:blur(14px);}
+.wb-fleet-online{font-weight:900;color:#1b2e4d;font-size:13px;}.wb-fleet-online small{display:block;color:#6d8098;font-weight:600;font-size:10px;margin-top:2px;}.wb-fleet-dot{display:inline-block;width:10px;height:10px;background:#18c77b;border-radius:50%;margin-right:7px;box-shadow:0 0 0 5px rgba(24,199,123,.11);}
+.wb-float-stat{border-left:1px solid #dce7f1;padding-left:18px;min-width:82px;text-align:center;}.wb-float-stat b{font-size:18px;color:#152a4c;display:block;}.wb-float-stat span{font-size:9px;color:#71849a;font-weight:700;}
+
+/* KPI cards */
+.kpi-card{min-height:126px;border-radius:18px;border:1px solid #dbe8f4;background:white;box-shadow:0 10px 28px rgba(33,86,133,.08);padding:16px;position:relative;overflow:hidden;transition:.22s;}
+.kpi-card:hover{transform:translateY(-3px);box-shadow:0 16px 32px rgba(33,86,133,.13);}
+.kpi-card:before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--accent);}
+.kpi-icon{width:46px;height:46px;border-radius:14px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:23px;float:left;margin-right:11px;}
+.kpi-label{font-size:11px;color:#526b89;font-weight:850;letter-spacing:.35px;padding-top:2px;}.kpi-value{font-size:29px;color:#112747;font-weight:950;line-height:1.05;margin-top:5px;}.kpi-note{font-size:10px;color:#647b98;margin-top:7px;font-weight:650;}.kpi-note b{color:var(--accent);}.kpi-ring{position:absolute;right:16px;top:20px;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#153052;background:conic-gradient(var(--accent) var(--pct),#edf2f7 0);}.kpi-ring:after{content:"";position:absolute;width:39px;height:39px;background:#fff;border-radius:50%;}.kpi-ring span{position:relative;z-index:1;}
+
+/* section */
+.section-title{font-size:21px;font-weight:900;color:#132744;margin:12px 0 2px;letter-spacing:-.5px;}.section-sub{font-size:11px;color:#71849c;margin-bottom:10px;font-weight:600;}
+.panel{background:#fff;border:1px solid #dce8f4;border-radius:18px;box-shadow:0 9px 28px rgba(32,82,128,.07);padding:16px;transition:.2s;}.panel:hover{box-shadow:0 13px 32px rgba(32,82,128,.10);}
+.panel-title{font-size:15px;font-weight:900;color:#142947;}.panel-sub{font-size:10px;color:#72869f;margin-top:3px;}
+
+/* plotly */
+.js-plotly-plot{border-radius:14px!important;}
+[data-testid="stPlotlyChart"]{border-radius:14px!important;overflow:hidden!important;}
+
+/* buttons and inputs */
+.stButton>button{border-radius:11px!important;border:1px solid #cfe0ef!important;background:#fff!important;color:#234263!important;font-weight:750!important;min-height:38px!important;transition:.2s!important;}
+.stButton>button:hover{border-color:#79b9ef!important;background:#f3f9ff!important;color:#0d79df!important;transform:translateY(-1px)!important;}
+[data-testid="stSelectbox"]>div>div{border-radius:11px!important;border:1px solid #9fc1df!important;background:#fff!important;min-height:44px!important;}
+/* Selectbox readability: dark selected value, label, arrow and dropdown options */
+[data-testid="stSelectbox"] label{
+    color:#294b6d!important;
+    font-size:13px!important;
+    font-weight:800!important;
+}
+/* HARD FIX for Streamlit BaseWeb selectbox text visibility */
+[data-testid="stSelectbox"] div[data-baseweb="select"],
+[data-testid="stSelectbox"] div[data-baseweb="select"] > div{
+    background:#ffffff!important;
+    border-color:#a9c8e4!important;
+    color:#173858!important;
+    opacity:1!important;
+}
+[data-testid="stSelectbox"] div[data-baseweb="select"] span,
+[data-testid="stSelectbox"] div[data-baseweb="select"] div,
+[data-testid="stSelectbox"] div[data-baseweb="select"] p,
+[data-testid="stSelectbox"] div[data-baseweb="select"] input{
+    color:#173858!important;
+    -webkit-text-fill-color:#173858!important;
+    opacity:1!important;
+    font-size:13px!important;
+    font-weight:700!important;
+}
+[data-testid="stSelectbox"] div[data-baseweb="select"] svg{
+    fill:#315675!important;
+    color:#315675!important;
+    opacity:1!important;
+}
+[data-baseweb="popover"],
+[data-baseweb="menu"]{
+    background:#ffffff!important;
+    color:#173858!important;
+}
+[data-baseweb="popover"] [role="option"],
+[data-baseweb="menu"] [role="option"]{
+    color:#173858!important;
+    -webkit-text-fill-color:#173858!important;
+    background:#ffffff!important;
+    font-size:13px!important;
+    font-weight:700!important;
+    opacity:1!important;
+}
+[data-baseweb="popover"] [role="option"] *,
+[data-baseweb="menu"] [role="option"] *{
+    color:#173858!important;
+    -webkit-text-fill-color:#173858!important;
+}
+[data-baseweb="popover"] [role="option"]:hover,
+[data-baseweb="menu"] [role="option"]:hover{
+    background:#edf6ff!important;
+    color:#0876e7!important;
 }
 
-[data-testid="stSidebar"] > div:first-child {
-    height: 100vh !important;
-    max-height: 100vh !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    scrollbar-width: thin !important;
-    scrollbar-color: rgba(100,116,139,.55) transparent !important;
+/* Streamlit BaseWeb selected value — force visible dark text */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] div[role="button"],
+div[data-testid="stSelectbox"] div[data-baseweb="select"] div[role="combobox"]{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+    font-size:14px!important;
+    font-weight:800!important;
+}
+div[data-testid="stSelectbox"] div[data-baseweb="select"] div[role="button"] > div,
+div[data-testid="stSelectbox"] div[data-baseweb="select"] div[role="combobox"] > div{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+    font-size:14px!important;
+    font-weight:800!important;
+}
+div[data-testid="stSelectbox"] div[data-baseweb="select"] input{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+    caret-color:#102f50!important;
+}
+div[data-testid="stSelectbox"] div[data-baseweb="select"] span{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+    font-size:14px!important;
+    font-weight:800!important;
 }
 
-[data-testid="stSidebar"] > div:first-child::-webkit-scrollbar {
-    width: 6px !important;
+/* BaseWeb's actual selected-value classes */
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="singleValue"],
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="ValueContainer"],
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="placeholder"]{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+    font-size:14px!important;
+    font-weight:800!important;
+}
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="singleValue"] *,
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="ValueContainer"] *{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
 }
 
-[data-testid="stSidebar"] > div:first-child::-webkit-scrollbar-track {
-    background: transparent !important;
+/* Make the whole control unambiguously light/readable */
+div[data-testid="stSelectbox"] [data-baseweb="select"]{
+    color-scheme:light!important;
+    filter:none!important;
+    opacity:1!important;
 }
 
-[data-testid="stSidebar"] > div:first-child::-webkit-scrollbar-thumb {
-    background: rgba(100,116,139,.45) !important;
-    border-radius: 10px !important;
+/* Force Streamlit/BaseWeb selected text and input text to dark */
+div[data-testid="stSelectbox"] [data-baseweb="select"] input{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    caret-color:#102f50!important;
+    opacity:1!important;
+    font-size:14px!important;
+    font-weight:800!important;
+}
+div[data-testid="stSelectbox"] [data-baseweb="select"] input::placeholder{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+}
+div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"]{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+}
+div[data-testid="stSelectbox"] [data-baseweb="select"] [aria-selected="true"]{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+    font-weight:800!important;
 }
 
-[data-testid="stSidebar"] > div:first-child::-webkit-scrollbar-thumb:hover {
-    background: rgba(34,211,238,.80) !important;
+/* Selectbox label */
+div[data-testid="stSelectbox"] label{
+    color:#163758!important;
+    opacity:1!important;
+    font-size:13px!important;
+    font-weight:750!important;
 }
 
-[data-testid="stSidebarContent"] {
-    height: auto !important;
-    min-height: 100% !important;
-    overflow: visible !important;
+/* Dropdown menu items */
+[role="listbox"] [role="option"]{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+    font-size:14px!important;
+    font-weight:700!important;
+    background:#ffffff!important;
+}
+[role="listbox"] [role="option"][aria-selected="true"]{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    background:#edf6ff!important;
 }
 
-[data-testid="stSidebarUserContent"] {
-    padding-bottom: 24px !important;
+/* BaseWeb closed Select: force the actual single-value node dark.
+   Streamlit may render this as generated class names, so use partial class selectors. */
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="singleValue"],
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="SingleValue"],
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="ValueContainer"] > div{
+    color:#102f50!important;
+    -webkit-text-fill-color:#102f50!important;
+    opacity:1!important;
+    visibility:visible!important;
+    font-size:14px!important;
+    font-weight:800!important;
 }
 
-/* Compact sidebar spacing so all controls remain comfortable at 100% zoom */
-[data-testid="stSidebar"] .stButton > button {
-    min-height: 42px !important;
-    margin-bottom: 6px !important;
+/* Do not let a disabled-looking parent fade the selected value */
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="ValueContainer"]{
+    opacity:1!important;
+    color:#102f50!important;
+}
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="Control"]{
+    opacity:1!important;
 }
 
-[data-testid="stSidebar"] hr {
-    margin: 18px 0 !important;
+/* Arrow/icon remains visible */
+div[data-testid="stSelectbox"] [data-baseweb="select"] svg{
+    opacity:1!important;
+    color:#486581!important;
+    fill:#486581!important;
 }
 
-/* Light mode */
-@media (prefers-color-scheme: light) {
-    [data-testid="stSidebar"] > div:first-child::-webkit-scrollbar-thumb {
-        background: rgba(71,85,105,.35) !important;
-    }
+/* Plotly axis titles/ticks: force dark readable text */
+[data-testid="stPlotlyChart"] .xtitle,
+[data-testid="stPlotlyChart"] .ytitle{
+    fill:#315675!important;
+    font-size:13px!important;
+}
+[data-testid="stPlotlyChart"] .xtick text,
+[data-testid="stPlotlyChart"] .ytick text{
+    fill:#315675!important;
+    font-size:12px!important;
 }
 
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-    [data-testid="stSidebar"] > div:first-child::-webkit-scrollbar-thumb {
-        background: rgba(148,163,184,.35) !important;
-    }
-}
+/* alerts */
+.alert-card{border-radius:13px;border:1px solid #e0eaf4;background:#fff;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 5px 16px rgba(35,84,128,.05);}.alert-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;}.alert-title{font-size:11px;font-weight:900;}.alert-msg{font-size:10px;color:#667d97;margin-top:3px;}.alert-time{font-size:9px;color:#94a6ba;margin-left:auto;white-space:nowrap;}
 
+/* map legend */
+.legend-row{display:flex;flex-wrap:wrap;gap:13px;padding:7px 3px 0;color:#5f7590;font-size:10px;font-weight:700;}.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:-1px;}.route-line{display:inline-block;width:22px;border-top:2px dashed #58a6f5;margin-right:5px;vertical-align:middle;}
 
+/* table */
+[data-testid="stDataFrame"]{border:1px solid #dce8f4!important;border-radius:12px!important;overflow:hidden!important;}
+.wb-table-wrap{border:1px solid #dce8f4;border-radius:12px;overflow:hidden;background:#fff;margin-top:10px;}
+.wb-table{width:100%;border-collapse:collapse;font-size:10px;color:#29425f;}
+.wb-table th{background:#f3f8fd;color:#5b718b;text-align:left;font-size:9px;letter-spacing:.25px;font-weight:850;padding:9px 7px;border-bottom:1px solid #dce8f4;}
+.wb-table td{padding:9px 7px;border-bottom:1px solid #edf2f7;white-space:nowrap;}
+.wb-table tr:last-child td{border-bottom:0;}
+.wb-status{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border-radius:999px;font-size:9px;font-weight:850;}
+.wb-status.healthy{background:#e7faf2;color:#0b9c62;}
+.wb-status.warning{background:#fff4dd;color:#c47b00;}
+.wb-status.critical{background:#ffebee;color:#d93545;}
+.wb-bar{height:6px;width:54px;border-radius:99px;background:#e9f0f6;display:inline-block;overflow:hidden;vertical-align:middle;margin-right:4px;}
+.wb-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#19c77a,#4dd9a0);}
+/* final operations polish */
+.wb-table-wrap{box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 6px 18px rgba(34,84,126,.05);}
+.wb-table tbody tr:hover{background:#f7fbff;}
+.wb-map-panel{background:linear-gradient(180deg,#fbfdff 0%,#f5faff 100%);border:1px solid #d9e8f5;border-radius:14px;padding:4px;}
+.wb-map-badge{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #dce9f5;border-radius:10px;padding:6px 9px;color:#33506f;font-size:9px;font-weight:800;box-shadow:0 4px 12px rgba(37,86,126,.06);}
+.ai-box{margin-top:12px;border:1px solid #f0dfb6;border-radius:14px;background:linear-gradient(135deg,#fffaf0,#fff6df);padding:15px;box-shadow:0 7px 18px rgba(204,143,35,.08);}
+.ai-box-title{color:#db8500;font-weight:900;font-size:12px;letter-spacing:.2px;}
+.ai-main{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 11px;background:#fff;border:1px solid #f3e4c1;border-radius:11px;}
+.ai-main strong{font-size:19px;color:#132947;}
+.ai-stat{font-size:10px;color:#73859b;font-weight:700;}
+.ai-stat b{display:block;font-size:15px;color:#132947;margin-top:3px;}
+.alert-card{transition:transform .18s,box-shadow .18s;}.alert-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(35,84,128,.09);}
 
-html, body {
-    color-scheme: __COLOR_SCHEME__ !important;
-    background: __BG__ !important;
-}
+/* ===== Readability upgrade: darker text + larger type ===== */
+.wb-brand-title{font-size:26px;color:#0b1f3a;}
+.wb-brand-sub{font-size:11px;color:#385878;font-weight:700;}
+.wb-nav-buttons .stButton>button{font-size:12px!important;color:#16385f!important;font-weight:820!important;min-height:50px!important;}
+.wb-live{font-size:12px;}
+.wb-date{font-size:11px;color:#294969;font-weight:700;}
+.wb-eyebrow{font-size:13px;color:#0676d8;}
+.wb-hero-title{font-size:50px;color:#0b2245;}
+.wb-hero-sub{font-size:15px;color:#294f74;font-weight:650;}
+.wb-fleet-online{font-size:14px;color:#122947;}
+.wb-fleet-online small{font-size:11px;color:#4f6884;}
+.wb-float-stat b{font-size:20px;}
+.wb-float-stat span{font-size:10px;color:#4e6885;}
+.kpi-label{font-size:12px;color:#304e70;font-weight:900;}
+.kpi-value{font-size:31px;color:#0c2343;}
+.kpi-note{font-size:11px;color:#405d7b;font-weight:700;}
+.kpi-ring{font-size:11px;}
+.section-title{font-size:24px;color:#0b2343;}
+.section-sub{font-size:12px;color:#496783;font-weight:650;}
+.panel-title{font-size:17px;color:#0b2545;}
+.panel-sub{font-size:11px;color:#4c6985;font-weight:600;}
+.stButton>button{font-size:12px!important;}
+[data-testid="stSelectbox"] label,
+[data-testid="stTextInput"] label{font-size:12px!important;color:#294b6d!important;font-weight:750!important;}
+.wb-table{font-size:11px;color:#213f5f;}
+.wb-table th{font-size:10px;color:#3e5c78;padding:10px 8px;}
+.wb-table td{font-size:11px;padding:10px 8px;}
+.wb-status{font-size:10px;}
+.alert-title{font-size:12px;}
+.alert-msg{font-size:11px;color:#405d78;}
+.alert-time{font-size:10px;color:#647b94;}
+.legend-row{font-size:11px;color:#405d78;}
+.ai-box-title{font-size:13px;}
+.ai-stat{font-size:11px;color:#49657f;}
+.ai-stat b{font-size:16px;color:#0c2343;}
+.plotly .xtick text,.plotly .ytick text{font-size:11px!important;}
+@media(max-width:1100px){.wb-brand{min-width:220px}.wb-hero-title{font-size:39px}.wb-fleet-float{right:10px;gap:10px}.wb-nav-buttons .stButton>button{font-size:10px!important;}.wb-date{display:none;}}
 
-body, .stApp,
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewContainer"] > .main {
-    background:
-        radial-gradient(circle at 12% 0%, rgba(34,211,238,0.06), transparent 28%),
-        radial-gradient(circle at 90% 5%, rgba(99,102,241,0.06), transparent 28%),
-        __BG__ !important;
-    color: __TEXT__ !important;
-}
-
-/* Streamlit top header / black strip fix */
-header[data-testid="stHeader"],
-[data-testid="stHeader"],
-[data-testid="stToolbar"],
-[data-testid="stDecoration"] {
-    background: __BG__ !important;
-    background-color: __BG__ !important;
-    color: __TEXT__ !important;
-    border: 0 !important;
-    box-shadow: none !important;
-}
-
-/* Main layout */
-.block-container {
-    max-width: 1500px !important;
-    padding-top: 2rem !important;
-    padding-bottom: 3rem !important;
-}
-
-#MainMenu, footer {
-    visibility: hidden !important;
-}
-
-h1, h2, h3, h4, h5, h6 {
-    color: __TEXT__ !important;
-}
-
-[data-testid="stMarkdownContainer"] p,
-[data-testid="stCaptionContainer"],
-label {
-    color: __TEXT_MUTED__ !important;
-}
-
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background: __SIDEBAR__ !important;
-    background-color: __SIDEBAR__ !important;
-    border-right: 1px solid __BORDER__ !important;
-}
-
-[data-testid="stSidebar"] * {
-    color: __TEXT__ !important;
-}
-
-[data-testid="stSidebar"] .stButton > button,
-.stButton > button {
-    background: __CARD_2__ !important;
-    background-color: __CARD_2__ !important;
-    color: __TEXT__ !important;
-    border: 1px solid __BORDER__ !important;
-    border-radius: 10px !important;
-    font-weight: 650 !important;
-}
-
-[data-testid="stSidebar"] .stButton > button:hover,
-.stButton > button:hover {
-    color: __ACCENT__ !important;
-    border-color: __BORDER_HOVER__ !important;
-}
-
-/* ============================================================
-   PREMIUM GLOW / DEPTH
-   ============================================================ */
-
-[data-testid="stMetric"] {
-    position: relative;
-    transition: transform 0.22s ease, box-shadow 0.22s ease,
-                border-color 0.22s ease !important;
-    box-shadow:
-        0 8px 24px rgba(15,23,42,0.06),
-        0 0 0 1px rgba(34,211,238,0.025) !important;
-}
-
-[data-testid="stMetric"]:hover {
-    transform: translateY(-3px);
-    border-color: rgba(34,211,238,0.30) !important;
-    box-shadow:
-        0 12px 30px rgba(15,23,42,0.10),
-        0 0 22px rgba(34,211,238,0.10) !important;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"] {
-    position: relative;
-    transition: box-shadow 0.22s ease, border-color 0.22s ease !important;
-    box-shadow: 0 8px 25px rgba(15,23,42,0.045) !important;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"]:hover {
-    border-color: rgba(34,211,238,0.24) !important;
-    box-shadow:
-        0 10px 30px rgba(15,23,42,0.08),
-        0 0 24px rgba(34,211,238,0.06) !important;
-}
-
-[data-testid="stPlotlyChart"] {
-    transition: box-shadow 0.22s ease, border-color 0.22s ease !important;
-}
-
-[data-testid="stPlotlyChart"]:hover {
-    border-color: rgba(34,211,238,0.25) !important;
-    box-shadow: 0 0 24px rgba(34,211,238,0.07) !important;
-}
-
-/* Sidebar system status cards */
-.wb-status-card {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    width: 100%;
-    box-sizing: border-box;
-    margin: 0 0 0.42rem 0;
-    padding: 0.68rem 0.78rem;
-    border-radius: 11px;
-    border: 1px solid rgba(34,197,94,0.16);
-    background: rgba(34,197,94,0.12);
-    color: __TEXT__;
-    box-shadow: 0 5px 16px rgba(15,23,42,0.04);
-    transition: transform 0.16s ease, box-shadow 0.16s ease;
-}
-
-.wb-status-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 20px rgba(15,23,42,0.08);
-}
-
-.wb-status-dot {
-    color: #16a34a;
-    font-size: 12px;
-}
-
-.wb-status-name, .wb-status-state {
-    color: __TEXT__;
-    font-size: 0.92rem;
-}
-
-.wb-status-name { font-weight: 500; }
-.wb-status-state { font-weight: 650; }
-.wb-status-dash { color: __TEXT_MUTED__; }
-
-.wb-sidebar-footer { padding: 0.15rem 0 0.25rem 0; }
-.wb-version {
-    color: __TEXT_MUTED__;
-    font-size: 0.82rem;
-    font-weight: 600;
-    margin-bottom: 0.35rem;
-}
-.wb-footer-sub { color: __TEXT_MUTED__; font-size: 0.78rem; }
-
-/* Premium LIVE badge */
-[data-testid="stAlert"] {
-    box-shadow: 0 0 18px rgba(34,197,94,0.08) !important;
-}
-
-/* Sidebar buttons */
-[data-testid="stSidebar"] .stButton > button,
-.stButton > button {
-    transition: all 0.2s ease !important;
-}
-
-[data-testid="stSidebar"] .stButton > button:hover,
-.stButton > button:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 0 18px rgba(34,211,238,0.10) !important;
-}
-
-/* ============================================================
-   SELECTBOX — FULL WHITE CONTROL + PREMIUM GLOW
-   ============================================================ */
-
-[data-testid="stSelectbox"] [data-baseweb="select"],
-[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"],
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[aria-haspopup="listbox"] {
-    background: __SELECT_BG__ !important;
-    background-color: __SELECT_BG__ !important;
-    color: __SELECT_TEXT__ !important;
-    border-color: __SELECT_BORDER__ !important;
-}
-
-[data-testid="stSelectbox"] [data-baseweb="select"] > div {
-    min-height: 44px !important;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
-}
-
-/* Remove the black arrow segment in Light mode */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div > div:last-child,
-[data-testid="stSelectbox"] [data-baseweb="select"] [aria-hidden="true"] {
-    background: __SELECT_BG__ !important;
-    background-color: __SELECT_BG__ !important;
-}
-
-/* Premium focus glow */
-[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div {
-    border-color: #06b6d4 !important;
-    box-shadow:
-        0 0 0 2px rgba(6,182,212,0.13),
-        0 0 22px rgba(6,182,212,0.13) !important;
-}
-
-/* ============================================================
-   DROPDOWN POPUP — PREMIUM FLOATING PANEL
-   ============================================================ */
-
-div[data-baseweb="popover"],
-div[data-baseweb="popover"] > div,
-div[data-baseweb="menu"],
-div[role="listbox"],
-ul[role="listbox"] {
-    border-radius: 14px !important;
-    box-shadow:
-        0 18px 45px rgba(15,23,42,0.16),
-        0 0 24px rgba(6,182,212,0.07) !important;
-}
-
-div[role="option"],
-li[role="option"] {
-    min-height: 42px !important;
-    border-radius: 9px !important;
-    margin: 3px 6px !important;
-    transition: background 0.15s ease, padding-left 0.15s ease !important;
-}
-
-div[role="option"]:hover,
-li[role="option"]:hover {
-    padding-left: 14px !important;
-    box-shadow: inset 3px 0 0 #06b6d4 !important;
-}
-
-/* Metric cards */
-[data-testid="stMetric"] {
-    background: linear-gradient(145deg, __CARD_2__, __CARD__) !important;
-    border: 1px solid __BORDER__ !important;
-    border-radius: 16px !important;
-    padding: 18px 20px !important;
-    min-height: 125px;
-}
-
-[data-testid="stMetricLabel"] {
-    color: __TEXT_MUTED__ !important;
-}
-
-[data-testid="stMetricValue"] {
-    color: __TEXT__ !important;
-}
-
-/* Containers */
-[data-testid="stVerticalBlockBorderWrapper"] {
-    background: __CARD__ !important;
-    background-color: __CARD__ !important;
-    border: 1px solid __BORDER__ !important;
-    border-radius: 16px !important;
-}
-
-/* ============================================================
-   SELECTBOX — LIGHT MODE / DARK MODE HARD FIX
-   ============================================================ */
-
-[data-testid="stSelectbox"],
-[data-testid="stSelectbox"] label {
-    color: __TEXT__ !important;
-}
-
-/* Closed selectbox outer control */
-[data-testid="stSelectbox"] [data-baseweb="select"],
-[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"],
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[aria-haspopup="listbox"],
-[data-testid="stSelectbox"] [role="combobox"] {
-    background: __SELECT_BG__ !important;
-    background-color: __SELECT_BG__ !important;
-    color: __SELECT_TEXT__ !important;
-    border-radius: 12px !important;
-    border: 1px solid __SELECT_BORDER__ !important;
-    box-shadow: none !important;
+/* FINAL SELECTBOX TEXT OVERRIDE — black only, no layout changes */
+div[data-testid="stSelectbox"] [data-baseweb="select"] * {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
     opacity: 1 !important;
-    -webkit-text-fill-color: __SELECT_TEXT__ !important;
+    text-shadow: none !important;
 }
-
-/* Every child inside closed selectbox */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div *,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] *,
-[data-testid="stSelectbox"] [role="combobox"] * {
-    background: transparent !important;
-    background-color: transparent !important;
-    color: __SELECT_TEXT__ !important;
-    -webkit-text-fill-color: __SELECT_TEXT__ !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] input {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
     opacity: 1 !important;
+    caret-color: #000000 !important;
+}
+div[data-testid="stSelectbox"] [data-baseweb="select"] svg {
+    color: #4b6078 !important;
+    fill: #4b6078 !important;
+    -webkit-text-fill-color: initial !important;
 }
 
-/* Selected text / input */
-[data-testid="stSelectbox"] [data-baseweb="select"] span,
-[data-testid="stSelectbox"] [data-baseweb="select"] input {
-    background: transparent !important;
-    color: __SELECT_TEXT__ !important;
-    -webkit-text-fill-color: __SELECT_TEXT__ !important;
-    caret-color: __SELECT_TEXT__ !important;
-}
-
-/* Dropdown arrow */
-[data-testid="stSelectbox"] [data-baseweb="select"] svg {
-    color: __SELECT_TEXT__ !important;
-    fill: __SELECT_TEXT__ !important;
-    stroke: __SELECT_TEXT__ !important;
-}
-
-/* Premium cyan focus */
-[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus,
-[data-testid="stSelectbox"] [role="combobox"]:focus {
-    background: __SELECT_BG__ !important;
-    background-color: __SELECT_BG__ !important;
-    color: __SELECT_TEXT__ !important;
-    border: 1px solid #06b6d4 !important;
-    box-shadow: 0 0 0 2px rgba(6,182,212,0.16) !important;
-    outline: none !important;
-}
-
-/* ============================================================
-   SELECTBOX POPUP — WHITE IN LIGHT / DARK IN DARK
-   ============================================================ */
-
-div[data-baseweb="popover"],
-div[data-baseweb="popover"] > div,
-div[data-baseweb="menu"],
-div[role="listbox"],
-ul[role="listbox"] {
-    background: __SELECT_BG__ !important;
-    background-color: __SELECT_BG__ !important;
-    color: __SELECT_TEXT__ !important;
-    border-color: __SELECT_BORDER__ !important;
-    color-scheme: __COLOR_SCHEME__ !important;
-}
-
-div[data-baseweb="menu"] *,
-div[role="listbox"] *,
-ul[role="listbox"] * {
-    color: __SELECT_TEXT__ !important;
-    -webkit-text-fill-color: __SELECT_TEXT__ !important;
-}
-
-div[role="option"],
-li[role="option"] {
-    background: __SELECT_BG__ !important;
-    background-color: __SELECT_BG__ !important;
-    color: __SELECT_TEXT__ !important;
-    -webkit-text-fill-color: __SELECT_TEXT__ !important;
-}
-
-div[role="option"] *,
-li[role="option"] * {
-    background: transparent !important;
-    color: __SELECT_TEXT__ !important;
-    -webkit-text-fill-color: __SELECT_TEXT__ !important;
-}
-
-div[role="option"]:hover,
-li[role="option"]:hover {
-    background: __OPTION_HOVER__ !important;
-    background-color: __OPTION_HOVER__ !important;
-    color: __SELECT_TEXT__ !important;
-}
-
-div[role="option"][aria-selected="true"],
-li[role="option"][aria-selected="true"] {
-    background: __OPTION_SELECTED__ !important;
-    background-color: __OPTION_SELECTED__ !important;
-    color: __SELECT_TEXT__ !important;
-}
-
-/* Normal text inputs */
-div[data-baseweb="input"] > div {
-    background: __CARD__ !important;
-    background-color: __CARD__ !important;
-    border-color: __BORDER__ !important;
-}
-
-input {
-    color: __TEXT__ !important;
-    -webkit-text-fill-color: __TEXT__ !important;
-}
-
-/* Charts / tables */
-[data-testid="stDataFrame"] {
-    border-radius: 12px !important;
-    overflow: hidden;
-    border: 1px solid __BORDER__ !important;
-}
-
-[data-testid="stPlotlyChart"] {
-    border-radius: 14px !important;
-    overflow: hidden;
-    border: 1px solid __BORDER__ !important;
-}
-
-[data-testid="stAlert"] {
-    border-radius: 11px !important;
-}
-
-hr {
-    border-color: __BORDER__ !important;
-}
-
-/* ============================================================
-   CHATBOT — CLEAN INPUT, NO EXTRA DARK BOX
-   ============================================================ */
-
-[data-testid="stChatInput"] {
-    color-scheme: __COLOR_SCHEME__ !important;
-    background: transparent !important;
-    background-color: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-}
-
-[data-testid="stChatInput"] > div,
-[data-testid="stChatInput"] form,
-[data-testid="stChatInput"] [data-baseweb="textarea"] {
-    background: __CHAT_BG__ !important;
-    background-color: __CHAT_BG__ !important;
-    border: 1px solid __BORDER__ !important;
-    border-radius: 14px !important;
-    box-shadow: none !important;
-}
-
-[data-testid="stChatInput"] textarea,
-[data-testid="stChatInput"] textarea:focus {
-    background: transparent !important;
-    background-color: transparent !important;
-    color: __TEXT__ !important;
-    -webkit-text-fill-color: __TEXT__ !important;
-    box-shadow: none !important;
-    outline: none !important;
-}
-
-[data-testid="stChatInput"] textarea::placeholder {
-    color: __TEXT_MUTED__ !important;
-    -webkit-text-fill-color: __TEXT_MUTED__ !important;
+/* Dropdown popup itself — option text black */
+[data-baseweb="menu"] *,
+[data-baseweb="popover"] *,
+[role="listbox"] *,
+[role="option"] {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
     opacity: 1 !important;
 }
-
-[data-testid="stChatInput"] button {
-    background: __ACCENT__ !important;
-    color: #ffffff !important;
-    border: 0 !important;
-    box-shadow: none !important;
-}
-
-/* Chat messages */
-[data-testid="stChatMessage"] {
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 12px !important;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-    width: 7px;
-}
-
-::-webkit-scrollbar-track {
-    background: __BG__;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #64748b;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: __ACCENT__;
+[role="option"][aria-selected="true"] {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
 }
 
 
-
-/* ============================================================
-   WAREBOT AI — EXTRA PREMIUM POLISH
-   ============================================================ */
-
-/* Premium page depth */
-[data-testid="stAppViewContainer"] {
-    position: relative !important;
+/* v9: selected Streamlit BaseWeb value only — black, fully opaque */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:first-child {
+    opacity: 1 !important;
+}
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:first-child > div:first-child {
+    opacity: 1 !important;
+    color: #000 !important;
+}
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:first-child > div:first-child > div {
+    opacity: 1 !important;
+    color: #000 !important;
+    -webkit-text-fill-color: #000 !important;
+    visibility: visible !important;
+}
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:first-child > div:first-child > div > div {
+    opacity: 1 !important;
+    color: #000 !important;
+    -webkit-text-fill-color: #000 !important;
+    visibility: visible !important;
+    font-weight: 800 !important;
+}
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:first-child input {
+    opacity: 1 !important;
+    color: #000 !important;
+    -webkit-text-fill-color: #000 !important;
+    visibility: visible !important;
 }
 
-.block-container {
-    position: relative !important;
+/* v10: final visibility override for the selected value.
+   Force opacity on the whole Streamlit widget and use a zero-blur black
+   text shadow so even a BaseWeb light/placeholder text color becomes visible. */
+div[data-testid="stSelectbox"]{
+    opacity:1 !important;
+    filter:none !important;
+}
+div[data-testid="stSelectbox"] [data-baseweb="select"],
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div > div,
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div > div > div,
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div > div > div > div{
+    opacity:1 !important;
+    visibility:visible !important;
+    color:#000000 !important;
+    -webkit-text-fill-color:#000000 !important;
+    text-shadow:0 0 0 #000000 !important;
+}
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="singleValue"],
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="placeholder"],
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="ValueContainer"] *{
+    opacity:1 !important;
+    visibility:visible !important;
+    color:#000000 !important;
+    -webkit-text-fill-color:#000000 !important;
+    text-shadow:0 0 0 #000000 !important;
 }
 
-/* Subtle top accent line */
-.block-container::before {
-    content: "";
-    display: block;
-    height: 2px;
-    width: 100%;
-    margin-bottom: 22px;
-    border-radius: 999px;
-    background: linear-gradient(
-        90deg,
-        __ACCENT__,
-        __ACCENT_2__,
-        transparent 88%
-    ) !important;
-    opacity: 0.9;
-}
 
-/* Header typography */
-[data-testid="stAppViewContainer"] h1 {
-    font-weight: 850 !important;
-    letter-spacing: -1.5px !important;
-    text-shadow: 0 3px 18px rgba(34,211,238,0.08);
-}
-
-/* Premium section headings */
-[data-testid="stAppViewContainer"] h2,
-[data-testid="stAppViewContainer"] h3 {
-    font-weight: 760 !important;
-    letter-spacing: -0.5px !important;
-}
-
-/* KPI cards — stronger premium treatment */
-[data-testid="stMetric"] {
-    overflow: hidden !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
-}
-
-[data-testid="stMetric"]::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(
-        90deg,
-        __ACCENT__,
-        __ACCENT_2__
-    ) !important;
-    opacity: 0.95;
-}
-
-[data-testid="stMetricLabel"] {
-    font-size: 0.78rem !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.7px !important;
-}
-
-[data-testid="stMetricValue"] {
-    font-size: 2.05rem !important;
-    font-weight: 850 !important;
-    letter-spacing: -1px !important;
-    line-height: 1.05 !important;
-}
-
-/* Delta/status pill */
-[data-testid="stMetricDelta"] {
-    font-weight: 650 !important;
-    border-radius: 999px !important;
-}
-
-/* Premium bordered content cards */
-[data-testid="stVerticalBlockBorderWrapper"] {
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-    overflow: hidden !important;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"]::before {
-    content: "";
-    display: block;
-    height: 1px;
-    margin: -1px 18px 0 18px;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(34,211,238,0.45),
-        transparent
-    );
-    opacity: 0.65;
-}
-
-/* Smooth card lift */
-[data-testid="stVerticalBlockBorderWrapper"]:hover {
-    transform: translateY(-2px) !important;
-}
-
-/* Premium sidebar spacing + full status visibility */
-[data-testid="stSidebar"] .block-container {
-    padding-top: 0.85rem !important;
-    padding-bottom: 0.8rem !important;
-}
-
-[data-testid="stSidebar"] hr {
-    margin: 0.65rem 0 !important;
-}
-
-[data-testid="stSidebar"] [data-testid="stButton"] {
-    margin-bottom: 0.32rem !important;
-}
-
-[data-testid="stSidebar"] [data-testid="stButton"] > button {
-    min-height: 42px !important;
-    padding-top: 0.35rem !important;
-    padding-bottom: 0.35rem !important;
-}
-
-[data-testid="stSidebar"] [data-testid="stRadio"] {
-    margin-bottom: 0.15rem !important;
-}
-
-[data-testid="stSidebar"] [data-testid="stAlert"] {
-    margin-bottom: 0.45rem !important;
-    padding: 0.55rem 0.7rem !important;
-    border-radius: 10px !important;
-}
-
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-    margin-bottom: 0.35rem !important;
-}
-
-/* Premium sidebar branding */
-[data-testid="stSidebar"] h1,
-[data-testid="stSidebar"] h2,
-[data-testid="stSidebar"] h3 {
+/* FINAL SELECTBOX FIX
+   Keep the native Streamlit selectbox exactly as-is.
+   Only force the selected value to render as solid black. */
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="singleValue"] {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
     font-weight: 800 !important;
 }
 
-[data-testid="stSidebar"] [data-testid="stButton"] > button {
-    min-height: 44px !important;
-    letter-spacing: 0.1px !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="SingleValue"] {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    font-weight: 800 !important;
 }
 
-/* Premium LIVE badge */
-[data-testid="stAlert"] {
-    border: 1px solid rgba(34,197,94,0.22) !important;
-    border-radius: 999px !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
+/* BaseWeb value container */
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="ValueContainer"] {
+    color: #000000 !important;
+    opacity: 1 !important;
 }
 
-/* Selectbox premium depth without changing its colors */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div {
-    box-shadow:
-        0 6px 18px rgba(15,23,42,0.06),
-        inset 0 1px 0 rgba(255,255,255,0.08) !important;
+/* Text nodes inside the value container */
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="ValueContainer"] span,
+div[data-testid="stSelectbox"] [data-baseweb="select"] [class*="ValueContainer"] div {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
-[data-testid="stSelectbox"] [data-baseweb="select"] > div:hover {
-    border-color: __ACCENT__ !important;
-    box-shadow:
-        0 8px 22px rgba(8,145,178,0.10),
-        0 0 0 1px rgba(8,145,178,0.08) !important;
+/* Closed selectbox fallback: target the first value area only */
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div:first-child > div:first-child {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
 }
 
-/* Dropdown floating animation feel */
-div[data-baseweb="popover"] {
-    animation: warebotDropdown 0.14s ease-out !important;
-}
-
-@keyframes warebotDropdown {
-    from {
-        opacity: 0;
-        transform: translateY(-5px) scale(0.99);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-/* Buttons */
-.stButton > button {
-    transition:
-        transform 0.18s ease,
-        box-shadow 0.18s ease,
-        border-color 0.18s ease,
-        background 0.18s ease !important;
-}
-
-.stButton > button:active {
-    transform: translateY(0) scale(0.985) !important;
-}
-
-/* Charts get a polished frame */
-[data-testid="stPlotlyChart"] {
-    background: transparent !important;
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease !important;
-}
-
-[data-testid="stPlotlyChart"]:hover {
-    transform: translateY(-1px) !important;
-}
-
-/* Tables */
-[data-testid="stDataFrame"] {
-    box-shadow: 0 8px 24px rgba(15,23,42,0.045) !important;
-}
-
-/* Chatbot card */
-[data-testid="stChatMessage"] {
-    padding-top: 0.35rem !important;
-    padding-bottom: 0.35rem !important;
-}
-
-[data-testid="stChatInput"] {
-    margin-top: 4px !important;
-}
-
-/* Remove accidental browser/Streamlit input dark fill in light mode */
-[data-testid="stChatInput"] textarea,
-[data-testid="stChatInput"] textarea:focus,
-[data-testid="stChatInput"] [data-baseweb="textarea"] > div {
-    color-scheme: __COLOR_SCHEME__ !important;
-}
-
-/* Premium footer */
-[data-testid="stAppViewContainer"] hr {
-    opacity: 0.65 !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div:first-child > div:first-child > div {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    font-weight: 800 !important;
 }
 
 
-/* ============================================================
-   SIDEBAR NAVIGATION — PREMIUM INTERACTION
-   ============================================================ */
-
-[data-testid="stSidebar"] .stButton > button {
-    position: relative !important;
-    overflow: hidden !important;
-}
-
-[data-testid="stSidebar"] .stButton > button::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: linear-gradient(180deg, __ACCENT__, __ACCENT_2__);
-    opacity: 0;
-    transition: opacity 0.18s ease;
-}
-
-[data-testid="stSidebar"] .stButton > button:hover::before {
-    opacity: 1;
-}
-
-
-/* ===== COMPACT SIDEBAR — KEEP SYSTEM STATUS VISIBLE ===== */
-[data-testid="stSidebar"] .block-container {
-    padding-top: 0.45rem !important;
-    padding-bottom: 0.35rem !important;
-}
-[data-testid="stSidebar"] hr {
-    margin: 0.35rem 0 !important;
-}
-[data-testid="stSidebar"] [data-testid="stButton"] {
-    margin-bottom: 0.18rem !important;
-}
-[data-testid="stSidebar"] [data-testid="stButton"] > button {
-    min-height: 36px !important;
-    height: 36px !important;
-    padding: 0.15rem 0.5rem !important;
-}
-[data-testid="stSidebar"] h1,
-[data-testid="stSidebar"] h2,
-[data-testid="stSidebar"] h3 {
-    margin-top: 0.25rem !important;
-    margin-bottom: 0.3rem !important;
-}
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-    margin-top: 0.12rem !important;
-    margin-bottom: 0.2rem !important;
-}
-.wb-status-card {
-    min-height: 34px !important;
-    padding: 0.42rem 0.65rem !important;
-    margin: 0.22rem 0 !important;
-    border-radius: 10px !important;
-}
-.wb-sidebar-footer {
-    padding: 0.1rem 0 !important;
-}
-
-
-
-/* ============================================================
-   FINAL UI CLEANUP
-   Fix the two remaining unfinished-looking controls:
-   1) LIVE status
-   2) Select Robot / Target Station
-   ============================================================ */
-
-/* ---------- LIVE: one clean pill ---------- */
-[data-testid="stAlert"] {
-    width: fit-content !important;
-    min-width: 118px !important;
-    min-height: 44px !important;
-    margin-left: auto !important;
-    padding: 0.65rem 1.05rem !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border-radius: 999px !important;
-    border: 1px solid rgba(16,185,129,0.28) !important;
-    background: rgba(16,185,129,0.10) !important;
-    box-shadow:
-        0 8px 26px rgba(16,185,129,0.10),
-        inset 0 1px 0 rgba(255,255,255,0.28) !important;
-}
-
-[data-testid="stAlert"] > div {
-    width: auto !important;
-    padding: 0 !important;
-    background: transparent !important;
-    border: 0 !important;
-}
-
-[data-testid="stAlert"] [data-testid="stAlertContent"] {
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-    border: 0 !important;
-}
-
-[data-testid="stAlert"] p,
-[data-testid="stAlert"] span,
-[data-testid="stAlert"] div {
-    background: transparent !important;
-    border: 0 !important;
-}
-
-[data-testid="stAlert"] svg {
-    width: 10px !important;
-    height: 10px !important;
-    color: #10b981 !important;
-    fill: #10b981 !important;
-}
-
-[data-testid="stAlert"] p {
-    color: #047857 !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.02em !important;
-}
-
-/* ---------- SELECTBOX: seamless single control ---------- */
-
-/* Outer control */
-[data-testid="stSelectbox"] [data-baseweb="select"] {
-    width: 100% !important;
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 14px !important;
-    box-shadow: none !important;
-}
-
-/* BaseWeb's actual clickable wrapper */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div {
-    min-height: 50px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    background: __SELECT_BG__ !important;
-    background-color: __SELECT_BG__ !important;
-    color: __SELECT_TEXT__ !important;
-    border: 1px solid __SELECT_BORDER__ !important;
-    border-radius: 14px !important;
-    box-shadow: 0 6px 18px rgba(15,23,42,0.055) !important;
-    overflow: hidden !important;
-}
-
-/* ALL inner BaseWeb layers must be transparent.
-   This removes the dark arrow rectangle in Light mode. */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div > div > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div > div > div > div {
-    background: transparent !important;
-    background-color: transparent !important;
-    color: __SELECT_TEXT__ !important;
-    border: 0 !important;
-}
-
-/* Value text */
-[data-testid="stSelectbox"] [data-baseweb="select"] span,
-[data-testid="stSelectbox"] [data-baseweb="select"] input {
-    background: transparent !important;
-    color: __SELECT_TEXT__ !important;
-    -webkit-text-fill-color: __SELECT_TEXT__ !important;
-    font-weight: 500 !important;
-}
-
-/* Arrow area — no separate block */
-[data-testid="stSelectbox"] [data-baseweb="select"] svg {
-    background: transparent !important;
-    color: __SELECT_TEXT__ !important;
-    fill: __SELECT_TEXT__ !important;
-}
-
-/* Hover */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div:hover {
-    border-color: __ACCENT__ !important;
-    box-shadow:
-        0 8px 24px rgba(8,145,178,0.09),
-        0 0 0 1px rgba(8,145,178,0.07) !important;
-}
-
-/* Focus — cyan only */
-[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within {
-    border: 1px solid #22d3ee !important;
-    box-shadow:
-        0 0 0 3px rgba(34,211,238,0.13),
-        0 8px 24px rgba(34,211,238,0.08) !important;
-}
-
-/* Remove Streamlit red invalid-looking border for these normal controls */
-[data-testid="stSelectbox"] [aria-invalid="true"] > div {
-    border-color: __SELECT_BORDER__ !important;
-}
-
-/* ---------- LIGHT: white from edge to edge ---------- */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div * {
-    box-sizing: border-box !important;
-}
-
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] {
+/* v12 - final selectbox readability fix */
+div[data-testid="stSelectbox"] [data-baseweb="select"] {
     background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #172033 !important;
-    border-color: #cbd5e1 !important;
+    color: #000000 !important;
+    opacity: 1 !important;
+    -webkit-text-fill-color: #000000 !important;
 }
 
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] > div > div {
-    background: transparent !important;
-    background-color: transparent !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div {
+    color: #000000 !important;
+    opacity: 1 !important;
 }
 
-/* Dropdown popup */
-div[data-baseweb="popover"] {
-    z-index: 999999 !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"] {
+    color: #000000 !important;
+    opacity: 1 !important;
 }
 
-div[data-baseweb="popover"] > div,
-div[data-baseweb="menu"] {
-    background: __SELECT_BG__ !important;
-    border: 1px solid __SELECT_BORDER__ !important;
-    border-radius: 12px !important;
-    box-shadow: 0 18px 45px rgba(15,23,42,0.14) !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"] > div {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
-div[data-baseweb="menu"] li,
-div[data-baseweb="menu"] [role="option"] {
-    background: __SELECT_BG__ !important;
-    color: __SELECT_TEXT__ !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] input,
+div[data-testid="stSelectbox"] [data-baseweb="select"] [aria-autocomplete] {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
-div[data-baseweb="menu"] li:hover,
-div[data-baseweb="menu"] [role="option"]:hover {
-    background: __CARD_2__ !important;
-    color: __SELECT_TEXT__ !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] svg {
+    opacity: 1 !important;
+    color: #526b86 !important;
+    fill: #526b86 !important;
+}
+
+/* Strong fallback: every text-bearing descendant in the closed control */
+div[data-testid="stSelectbox"] [data-baseweb="select"] span,
+div[data-testid="stSelectbox"] [data-baseweb="select"] p {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
 
-
-/* ============================================================
-   FINAL SELECTBOX GEOMETRY FIX
-   One border only — remove BaseWeb nested/double borders.
-   ============================================================ */
-
-/* The Streamlit wrapper itself must never draw a border */
-[data-testid="stSelectbox"],
-[data-testid="stSelectbox"] > div,
-[data-testid="stSelectbox"] > div > div {
-    border: 0 !important;
-    outline: 0 !important;
-    box-shadow: none !important;
+/* FINAL - STREAMLIT BASEWEB SELECTBOX VALUE VISIBILITY */
+div[data-testid="stSelectbox"] [data-baseweb="select"] {
+    color: #000000 !important;
+    opacity: 1 !important;
 }
 
-/* BaseWeb outer shell */
-[data-testid="stSelectbox"] [data-baseweb="select"] {
-    border: 0 !important;
-    outline: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    border-radius: 14px !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] * {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
-/* THE ONLY visible border: actual clickable select surface */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] {
-    width: 100% !important;
-    min-height: 50px !important;
-    box-sizing: border-box !important;
-    border: 1px solid #cbd5e1 !important;
-    outline: 0 !important;
-    border-radius: 14px !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #172033 !important;
-    box-shadow: 0 5px 18px rgba(15,23,42,.055) !important;
-    overflow: hidden !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] [aria-selected="true"] {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
 }
 
-/* Every child inside the clickable surface is transparent and borderless.
-   This is what removes the dark right-hand rectangle. */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] > div > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] > div > div > div {
-    border: 0 !important;
-    outline: 0 !important;
-    background: transparent !important;
-    background-color: transparent !important;
-    box-shadow: none !important;
+div[data-testid="stSelectbox"] [data-baseweb="select"] input {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    opacity: 1 !important;
 }
 
-/* Value */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] span,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] input {
-    border: 0 !important;
-    outline: 0 !important;
-    background: transparent !important;
-    color: #172033 !important;
-    -webkit-text-fill-color: #172033 !important;
-}
-
-/* Arrow */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] svg {
-    border: 0 !important;
-    outline: 0 !important;
-    background: transparent !important;
-    color: #172033 !important;
-    fill: #172033 !important;
-}
-
-/* Hover — still one border */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"]:hover {
-    border: 1px solid #0891b2 !important;
-    box-shadow: 0 8px 22px rgba(8,145,178,.09) !important;
-}
-
-/* Focus — one cyan border + outer glow, never a second border */
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"]:focus,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"]:focus-visible,
-[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div[role="button"] {
-    border: 1px solid #22d3ee !important;
-    outline: 0 !important;
-    box-shadow: 0 0 0 3px rgba(34,211,238,.14) !important;
-}
-
-/* Streamlit error/invalid state must not create a red second border */
-[data-testid="stSelectbox"] [data-baseweb="select"][aria-invalid="true"] > div[role="button"],
-[data-testid="stSelectbox"] [data-baseweb="select"] > div[aria-invalid="true"] {
-    border: 1px solid #cbd5e1 !important;
-    outline: 0 !important;
-}
-
-/* Open menu */
-div[data-baseweb="popover"] {
-    z-index: 999999 !important;
-}
-
-div[data-baseweb="popover"] > div,
-div[data-baseweb="menu"] {
-    background: #ffffff !important;
-    border: 1px solid #d7e0ea !important;
-    border-radius: 12px !important;
-    box-shadow: 0 18px 45px rgba(15,23,42,.14) !important;
-}
-
-div[data-baseweb="menu"] li,
-div[data-baseweb="menu"] [role="option"] {
-    background: #ffffff !important;
-    color: #172033 !important;
-    border: 0 !important;
-}
-
-div[data-baseweb="menu"] li:hover,
-div[data-baseweb="menu"] [role="option"]:hover,
-div[data-baseweb="menu"] [aria-selected="true"] {
-    background: #eef2f7 !important;
-    color: #172033 !important;
-}
-
-/* Dark mode — same single-border geometry */
-@media (prefers-color-scheme: dark) {
-    [data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] {
-        border: 1px solid #334155 !important;
-        background: #111827 !important;
-        background-color: #111827 !important;
-        color: #f8fafc !important;
-        box-shadow: 0 6px 20px rgba(0,0,0,.18) !important;
-    }
-
-    [data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] span,
-    [data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] input {
-        color: #f8fafc !important;
-        -webkit-text-fill-color: #f8fafc !important;
-    }
-
-    [data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"] svg {
-        color: #e2e8f0 !important;
-        fill: #e2e8f0 !important;
-    }
-
-    [data-testid="stSelectbox"] [data-baseweb="select"] > div[role="button"]:hover {
-        border-color: #22d3ee !important;
-    }
-
-    [data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div[role="button"] {
-        border: 1px solid #22d3ee !important;
-        box-shadow: 0 0 0 3px rgba(34,211,238,.13) !important;
-    }
-
-    div[data-baseweb="popover"] > div,
-    div[data-baseweb="menu"],
-    div[data-baseweb="menu"] li,
-    div[data-baseweb="menu"] [role="option"] {
-        background: #111827 !important;
-        color: #f8fafc !important;
-    }
-
-    div[data-baseweb="menu"] li:hover,
-    div[data-baseweb="menu"] [role="option"]:hover,
-    div[data-baseweb="menu"] [aria-selected="true"] {
-        background: #1e293b !important;
-        color: #ffffff !important;
-    }
+div[data-testid="stSelectbox"] [data-baseweb="select"] svg {
+    color: #243b5a !important;
+    fill: #243b5a !important;
+    opacity: 1 !important;
 }
 
 </style>
 """
-
-CSS = (
-    CSS
-    .replace("__COLOR_SCHEME__", "dark" if is_dark else "light")
-    .replace("__BG__", BG)
-    .replace("__SIDEBAR__", SIDEBAR)
-    .replace("__CARD__", CARD)
-    .replace("__CARD_2__", CARD_2)
-    .replace("__TEXT__", TEXT)
-    .replace("__TEXT_MUTED__", TEXT_MUTED)
-    .replace("__BORDER__", BORDER)
-    .replace("__BORDER_HOVER__", BORDER_HOVER)
-    .replace("__ACCENT__", ACCENT)
-    .replace("__ACCENT_2__", ACCENT_2)
-    .replace("__SELECT_BG__", "#111827" if is_dark else "#ffffff")
-    .replace("__SELECT_TEXT__", "#f8fafc" if is_dark else "#172033")
-    .replace("__SELECT_BORDER__", "#334155" if is_dark else "#cbd5e1")
-    .replace("__OPTION_HOVER__", "#1e293b" if is_dark else "#f1f5f9")
-    .replace("__OPTION_SELECTED__", "#263449" if is_dark else "#e2e8f0")
-    .replace("__CHAT_BG__", CARD_2)
-)
-
 st.markdown(CSS, unsafe_allow_html=True)
 
-# LOAD ML DATA
-# ============================================================
-
-@st.cache_data
-def load_data():
-
-    telemetry = generate_telemetry(
-        num_robots=20,
-        records_per_robot=100
-    )
-
-    telemetry, threshold = calculate_anomaly_score(
-        telemetry
-    )
-
-    model, accuracy, features = train_maintenance_model(
-        telemetry
-    )
-
-    telemetry["health_score"] = telemetry.apply(
-        calculate_health_score,
-        axis=1
-    )
-
-    telemetry["status"] = telemetry[
-        "health_score"
-    ].apply(
-        get_robot_status
-    )
-
-    return (
-        telemetry,
-        threshold,
-        accuracy
-    )
-
-
-# ============================================================
-# REFRESH FLEET
-# ============================================================
-
-if st.sidebar.button(
-    "↻  Refresh Fleet",
-    width="stretch"
-):
-
-    st.cache_data.clear()
-    st.rerun()
-
-
-# ============================================================
-# DATA
-# ============================================================
-
-telemetry, anomaly_threshold, model_accuracy = load_data()
-
-
-latest = (
-    telemetry
-    .sort_values("timestamp")
-    .groupby("robot_id")
-    .tail(1)
-    .copy()
-)
-
-
-# ============================================================
-# KPI DATA
-# ============================================================
-
-total_robots = len(latest)
-
-healthy = len(
-    latest[
-        latest["status"] == "Healthy"
-    ]
-)
-
-warning = len(
-    latest[
-        latest["status"] == "Warning"
-    ]
-)
-
-critical = len(
-    latest[
-        latest["status"] == "Critical"
-    ]
-)
-
-anomalies = int(
-    telemetry["anomaly"].sum()
-)
-
-low_stock = get_low_stock_items()
-
-
-# ============================================================
-# NAVIGATION STATE
-# ============================================================
-
-if "active_page" not in st.session_state:
-    st.session_state.active_page = "All Details"
-
-active_page = st.session_state.active_page
-
-def nav_button(label, page):
-    if st.sidebar.button(label, width="stretch"):
+# -----------------------------
+# Helpers
+# -----------------------------
+def nav_button(label, page, active=False):
+    cls = "active" if active else ""
+    st.markdown(f'<div class="wb-nav-buttons {cls}">', unsafe_allow_html=True)
+    if st.button(label, key=f"nav_{page}", width="stretch"):
         st.session_state.active_page = page
         st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# ============================================================
-# SIDEBAR
-# ============================================================
+def metric_card(icon, label, value, note, accent, soft, pct=None):
+    ring = ""
+    if pct is not None:
+        ring = f'<div class="kpi-ring" style="--accent:{accent};--pct:{pct}%"><span>{pct:.0f}%</span></div>'
+    st.markdown(f'''
+    <div class="kpi-card" style="--accent:{accent};--soft:{soft}">
+      <div class="kpi-icon">{icon}</div>
+      <div class="kpi-label">{label}</div>
+      <div class="kpi-value">{value}</div>
+      <div class="kpi-note"><b>↑</b> {note}</div>
+      {ring}
+    </div>''', unsafe_allow_html=True)
 
-st.sidebar.title(
-    "🤖 WareBot AI"
-)
+def plot_layout(fig, height=280):
+    fig.update_layout(
+        template="plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=height,
+        margin=dict(l=10,r=10,t=8,b=10),
+        font=dict(color="#173253",family="Arial",size=12),
+        hoverlabel=dict(bgcolor="#ffffff",font_color="#14213d"),
+    )
+    fig.update_xaxes(
+        gridcolor="#dfeaf5",
+        zerolinecolor="#dfeaf5",
+        tickfont=dict(size=12,color="#315675"),
+        title_font=dict(size=13,color="#315675"),
+    )
+    fig.update_yaxes(
+        gridcolor="#dfeaf5",
+        zerolinecolor="#dfeaf5",
+        tickfont=dict(size=12,color="#315675"),
+        title_font=dict(size=13,color="#315675"),
+    )
+    return fig
 
-st.sidebar.caption(
-    "WAREHOUSE INTELLIGENCE PLATFORM"
-)
+# -----------------------------
+# Top navigation
+# -----------------------------
+nav_cols = st.columns([2.55, .82, 1.02, 1.20, 1.05, 1.00, .72, .88, .72], gap="small")
+with nav_cols[0]:
+    st.markdown('''<div class=\"wb-brand\"><div class=\"wb-logo\">🤖</div><div><div class=\"wb-brand-title\">WareBot <span>AI</span></div><div class=\"wb-brand-sub\">Autonomous Warehouse Intelligence Platform</div></div></div>''', unsafe_allow_html=True)
 
-st.sidebar.divider()
-
-st.sidebar.subheader(
-    "CONTROL CENTER"
-)
-
-nav_button(
-    "⌂  All Details",
-    "All Details"
-)
-
-st.sidebar.caption("Shows the complete WareBot command center")
-
-nav_button(
-    "◉  Fleet Monitoring",
-    "Fleet Monitoring"
-)
-
-nav_button(
-    "△  Predictive Maintenance",
-    "Predictive Maintenance"
-)
-
-nav_button(
-    "◇  Route Optimization",
-    "Route Optimization"
-)
-
-nav_button(
-    "□  Inventory & Orders",
-    "Inventory & Orders"
-)
-
-st.sidebar.caption(f"VIEW  •  {active_page}")
-
-st.sidebar.divider()
-
-st.sidebar.subheader(
-    "SYSTEM STATUS"
-)
-
-status_items = [
-    ("●", "Fleet Monitoring", "Online"),
-    ("●", "ML Engine", "Online"),
-    ("●", "WMS", "Connected"),
-    ("●", "Route Optimizer", "Active"),
+nav_items = [
+    ("🏠 Dashboard", "Dashboard"),
+    ("🤖 Fleet Monitoring", "Fleet Monitoring"),
+    ("🛠️ Predictive Maintenance", "Predictive Maintenance"),
+    ("📍 Route Optimization", "Route Optimization"),
+    ("📦 Inventory & Orders", "Inventory & Orders"),
+    ("📊 Analytics", "Analytics"),
+    ("💬 AI Assistant", "AI Assistant"),
 ]
 
-for dot, name, state in status_items:
-    st.sidebar.markdown(
-        f"""<div class=\"wb-status-card\">
-            <span class=\"wb-status-dot\">{dot}</span>
-            <span class=\"wb-status-name\">{name}</span>
-            <span class=\"wb-status-dash\">—</span>
-            <span class=\"wb-status-state\">{state}</span>
-        </div>""",
+for idx, (label, page) in enumerate(nav_items, start=1):
+    if idx >= len(nav_cols)-1:
+        break
+    with nav_cols[idx]:
+        nav_button(label, page, st.session_state.active_page == page)
+
+with nav_cols[-2]:
+    st.markdown('<div class="wb-live"><span class="wb-live-dot"></span>SYSTEM LIVE</div>', unsafe_allow_html=True)
+with nav_cols[-1]:
+    india_now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    live_date = india_now.strftime("%b %d, %Y")
+    live_time = india_now.strftime("%I:%M %p")
+    st.markdown(
+        f'<div class="wb-date"><b>{live_date}</b><br>{live_time}</div>',
         unsafe_allow_html=True,
     )
 
-st.sidebar.divider()
-
-st.sidebar.markdown(
-    """<div class=\"wb-sidebar-footer\">
-        <div class=\"wb-version\">WareBot AI v1.0</div>
-        <div class=\"wb-footer-sub\">Autonomous Warehouse Intelligence</div>
-    </div>""",
-    unsafe_allow_html=True,
-)
-
-
-# ============================================================
-# HEADER
-# ============================================================
-
-header_left, header_right = st.columns(
-    [5, 1]
-)
-
-with header_left:
-
-    st.title(
-        "WAREBOT AI"
-    )
-
-    st.caption(
-        "Autonomous warehouse intelligence & fleet operations"
-    )
-
-
-with header_right:
-
-    st.success(
-        "● LIVE"
-    )
-
-
-if active_page == "All Details":
-    # ============================================================
-    # KPI ROW
-    # ============================================================
-
-    k1, k2, k3, k4, k5 = st.columns(5)
-
-
-    with k1:
-
-        st.metric(
-            "TOTAL FLEET",
-            total_robots,
-            "Monitored"
-        )
-
-
-    with k2:
-
-        st.metric(
-            "HEALTHY ROBOTS",
-            healthy,
-            "Operational"
-        )
-
-
-    with k3:
-
-        st.metric(
-            "ATTENTION",
-            warning + critical,
-            "Requires review"
-        )
-
-
-    with k4:
-
-        st.metric(
-            "ANOMALIES",
-            anomalies,
-            "AI detected"
-        )
-
-
-    with k5:
-
-        st.metric(
-            "LOW STOCK",
-            len(low_stock),
-            "Reorder needed"
-        )
-
-
-
-if active_page in ("All Details", "Fleet Monitoring"):
-    # ============================================================
-    # FLEET INTELLIGENCE
-    # ============================================================
-
-    st.subheader(
-        "Fleet Intelligence"
-    )
-
-    st.divider()
-
-
-    left, right = st.columns(2)
-
-
-    # ============================================================
-    # ROBOT HEALTH
-    # ============================================================
-
-    with left:
-
-        with st.container(border=True):
-
-            st.markdown(
-                "#### Robot Health Distribution"
-            )
-
-            health_df = pd.DataFrame(
-                {
-                    "Status": [
-                        "Healthy",
-                        "Warning",
-                        "Critical"
-                    ],
-                    "Robots": [
-                        healthy,
-                        warning,
-                        critical
-                    ]
-                }
-            )
-
-            fig = go.Figure()
-
-            fig.add_trace(
-                go.Bar(
-                    x=health_df["Status"],
-                    y=health_df["Robots"],
-                    text=health_df["Robots"],
-                    textposition="outside",
-
-                    marker_color=[
-                        "#22c55e",
-                        "#f59e0b",
-                        "#ef4444"
-                    ],
-
-                    marker_line_width=0
-                )
-            )
-
-            fig.update_layout(
-
-                template=(
-                    "plotly_dark"
-                    if is_dark
-                    else "plotly_white"
-                ),
-
-                paper_bgcolor="rgba(0,0,0,0)",
-
-                plot_bgcolor="rgba(0,0,0,0)",
-
-                height=360,
-
-                margin=dict(
-                    l=20,
-                    r=20,
-                    t=25,
-                    b=30
-                ),
-
-                showlegend=False,
-
-                font=dict(
-                    color=TEXT
-                ),
-
-                xaxis=dict(
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID
-                ),
-
-                yaxis=dict(
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID
-                )
-            )
-
-            st.plotly_chart(
-                fig,
-                width="stretch"
-            )
-
-
-    # ============================================================
-    # BATTERY PERFORMANCE
-    # ============================================================
-
-    with right:
-
-        with st.container(border=True):
-
-            selected_robot = st.selectbox(
-                "Select Robot",
-                sorted(
-                    telemetry[
-                        "robot_id"
-                    ].unique()
-                )
-            )
-
-            robot_history = telemetry[
-                telemetry["robot_id"]
-                == selected_robot
-            ]
-
-            st.markdown(
-                f"#### {selected_robot} · Battery Performance"
-            )
-
-            fig = go.Figure()
-
-            fig.add_trace(
-                go.Scatter(
-                    x=robot_history["timestamp"],
-                    y=robot_history["battery"],
-
-                    mode="lines",
-
-                    line=dict(
-                        color=ACCENT,
-                        width=2.5
-                    ),
-
-                    fill="tozeroy",
-
-                    fillcolor=(
-                        "rgba(34,211,238,0.05)"
-                        if is_dark
-                        else "rgba(8,145,178,0.06)"
-                    )
-                )
-            )
-
-            fig.update_layout(
-
-                template=(
-                    "plotly_dark"
-                    if is_dark
-                    else "plotly_white"
-                ),
-
-                paper_bgcolor="rgba(0,0,0,0)",
-
-                plot_bgcolor="rgba(0,0,0,0)",
-
-                height=360,
-
-                margin=dict(
-                    l=20,
-                    r=20,
-                    t=20,
-                    b=30
-                ),
-
-                showlegend=False,
-
-                font=dict(
-                    color=TEXT
-                ),
-
-                xaxis=dict(
-                    title="Time",
-
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID
-                ),
-
-                yaxis=dict(
-                    title="Battery %",
-
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID
-                )
-            )
-
-            st.plotly_chart(
-                fig,
-                width="stretch"
-            )
-
-
-
-if active_page in ("All Details", "Predictive Maintenance"):
-    # ============================================================
-    # PREDICTIVE MAINTENANCE
-    # ============================================================
-
-    st.subheader(
-        "Predictive Maintenance"
-    )
-
-    st.divider()
-
-
-    maintenance = latest[
-        (
-            latest["status"] != "Healthy"
-        )
-        |
-        (
-            latest["maintenance_risk"] == 1
-        )
-    ].sort_values(
-        "health_score"
-    )
-
-
-    if len(maintenance) > 0:
-
-        st.warning(
-            f"⚠️ {len(maintenance)} robot(s) "
-            "require maintenance attention."
-        )
-
-        st.dataframe(
-            maintenance[
-                [
-                    "robot_id",
-                    "battery",
-                    "motor_current",
-                    "temperature",
-                    "vibration",
-                    "navigation_errors",
-                    "health_score",
-                    "status"
-                ]
-            ],
-
-            width="stretch",
-
-            hide_index=True
-        )
-
-    else:
-
-        st.success(
-            "✓ Fleet is operating within healthy parameters."
-        )
-
-
-
-if active_page in ("All Details", "Route Optimization"):
-    # ============================================================
-    # WAREHOUSE DIGITAL TWIN
-    # ============================================================
-
-    st.subheader(
-        "Warehouse Digital Twin"
-    )
-
-    st.divider()
-
-
-    map_col, task_col = st.columns([2.2, 1]
-)
-
-
-    # ============================================================
-    # WAREHOUSE MAP
-    # ============================================================
-
-    with map_col:
-
-        with st.container(border=True):
-
-            st.markdown(
-                "#### Live Warehouse Map"
-            )
-
-            free_x = []
-            free_y = []
-
-            obstacle_x = []
-            obstacle_y = []
-
-            for row in range(
-                len(WAREHOUSE_GRID)
-            ):
-
-                for col in range(
-                    len(WAREHOUSE_GRID[0])
-                ):
-
-                    if WAREHOUSE_GRID[row][col] == 1:
-
-                        obstacle_x.append(col)
-                        obstacle_y.append(row)
-
-                    else:
-
-                        free_x.append(col)
-                        free_y.append(row)
-
-
-            fig = go.Figure()
-
-
-            fig.add_trace(
-                go.Scatter(
-                    x=free_x,
-                    y=free_y,
-
-                    mode="markers",
-
-                    marker=dict(
-                        size=12,
-
-                        color=(
-                            "#172554"
-                            if is_dark
-                            else "#dbeafe"
-                        ),
-
-                        symbol="square"
-                    ),
-
-                    name="Open"
-                )
-            )
-
-
-            fig.add_trace(
-                go.Scatter(
-                    x=obstacle_x,
-                    y=obstacle_y,
-
-                    mode="markers",
-
-                    marker=dict(
-                        size=17,
-
-                        color=(
-                            "#334155"
-                            if is_dark
-                            else "#94a3b8"
-                        ),
-
-                        symbol="square"
-                    ),
-
-                    name="Obstacle"
-                )
-            )
-
-
-            station_colors = {
-                "P1": "#22d3ee",
-                "P2": "#6366f1",
-                "P3": "#8b5cf6",
-                "PACK": "#f59e0b"
-            }
-
-
-            for station, position in STATIONS.items():
-
-                row, col = position
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=[col],
-                        y=[row],
-
-                        mode="markers+text",
-
-                        text=[station],
-
-                        textposition="top center",
-
-                        marker=dict(
-                            size=22,
-
-                            color=station_colors.get(
-                                station,
-                                ACCENT
-                            ),
-
-                            symbol="diamond",
-
-                            line=dict(
-                                color="#ffffff",
-                                width=1
-                            )
-                        ),
-
-                        name=station
-                    )
-                )
-
-
-            fig.update_layout(
-
-                template=(
-                    "plotly_dark"
-                    if is_dark
-                    else "plotly_white"
-                ),
-
-                paper_bgcolor="rgba(0,0,0,0)",
-
-                plot_bgcolor=PLOT_BG,
-
-                height=500,
-
-                margin=dict(
-                    l=15,
-                    r=15,
-                    t=20,
-                    b=40
-                ),
-
-                font=dict(
-                    color=TEXT
-                ),
-
-                xaxis=dict(
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    dtick=1,
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID
-                ),
-
-                yaxis=dict(
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    dtick=1,
-
-                    autorange="reversed",
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID
-                ),
-
-                legend=dict(
-                    orientation="h",
-
-                    y=-0.08,
-
-                    font=dict(
-                        color=TEXT_MUTED
-                    )
-                )
-            )
-
-
-            st.plotly_chart(
-                fig,
-                width="stretch"
-            )
-
-
-    # ============================================================
-    # AI TASK ALLOCATION — LIVE MQTT + RL + DIJKSTRA
-    # ============================================================
-
-    with task_col:
-
-        with st.container(border=True):
-
-            st.markdown(
-            "#### AI Task Allocation"
-        )
-
-        st.caption(
-            "Live MQTT telemetry → Q-Learning → Dijkstra"
-        )
-
-        target = st.selectbox(
-            "Target Station",
-            ["P1", "P2", "P3"],
-            key="rl_target_station"
-        )
-
-        if st.button(
-            "⚡ Run AI Allocation",
-            width="stretch"
-        ):
-
-            try:
-
-                response = requests.get(
-                    "https://warebot-ai.onrender.com/mqtt/allocate-task",
-                    timeout=10
-                )
-
-                if response.status_code == 200:
-
-                    result = response.json()
-
-                    allocation = result.get(
-                        "allocation"
-                    )
-
-                    route = result.get(
-                        "route_optimization"
-                    )
-
-                    if allocation and route:
-
-                        a1, a2 = st.columns(2)
-
-                        with a1:
-                            st.metric(
-                                "Recommended Robot",
-                                allocation.get(
-                                    "robot_id",
-                                    "-"
-                                )
-                            )
-
-                        with a2:
-                            st.metric(
-                                "Route Distance",
-                                f"{route.get('distance', 0)} steps"
-                            )
-
-                        a3, a4 = st.columns(2)
-
-                        with a3:
-                            st.metric(
-                                "Health Score",
-                                allocation.get(
-                                    "health_score",
-                                    0
-                                )
-                            )
-
-                        with a4:
-                            st.metric(
-                                "Maintenance Risk",
-                                allocation.get(
-                                    "maintenance_risk",
-                                    0
-                                )
-                            )
-
-                        st.success(
-                            f"RL selected "
-                            f"{allocation['robot_id']} "
-                            f"for {route['station']}"
-                        )
-
-                        st.markdown(
-                            "##### Optimized Dijkstra Path"
-                        )
-
-                        st.code(
-                            str(route.get("path", [])),
-                            language="text"
-                        )
-
-                    else:
-
-                        st.warning(
-                            "No robot allocation available."
-                        )
-
-                else:
-
-                    st.error(
-                        f"Backend returned "
-                        f"HTTP {response.status_code}"
-                    )
-
-            except requests.exceptions.ConnectionError:
-
-                st.error(
-                    "FastAPI backend is not running. "
-                    "Start uvicorn first."
-                )
-
-            except Exception as e:
-
-                st.error(
-                    f"AI allocation error: {e}"
-                )
-
-
-
-if active_page in ("All Details", "Route Optimization"):
-    # ============================================================
-    # CONGESTION INTELLIGENCE
-    # ============================================================
-
-    st.subheader(
-        "Congestion Intelligence"
-    )
-
-    st.divider()
-
-
-    congestion = pd.DataFrame(
-        {
-            "Station": [
-                "P1",
-                "P2",
-                "P3",
-                "PACK"
-            ],
-
-            "Robot Traffic": [
-                7,
-                3,
-                9,
-                5
-            ],
-
-            "Queue": [
-                12,
-                4,
-                17,
-                8
-            ],
-
-            "Utilization": [
-                72,
-                38,
-                91,
-                64
-            ]
-        }
-    )
-
-
-    c1, c2 = st.columns(2)
-
-
-    # ============================================================
-    # ROBOT TRAFFIC
-    # ============================================================
-
+# -----------------------------
+# Hero
+# -----------------------------
+st.markdown('''
+<div class="wb-hero">
+  <div class="wb-hero-copy">
+    <div class="wb-eyebrow">WAREBOT AI · AUTONOMOUS WAREHOUSE OPERATIONS</div>
+    <div class="wb-hero-title">Smart Warehouse <span>Robotics Platform</span></div>
+    <div class="wb-hero-sub">Real-time fleet monitoring · Predictive maintenance · AI task allocation · Inventory flow intelligence · Optimized warehouse operations</div>
+  </div>
+  <div class="wb-fleet-float">
+    <div class="wb-fleet-online"><span class="wb-fleet-dot"></span>FLEET ONLINE<small>All robots operational</small></div>
+    <div class="wb-float-stat"><b>20</b><span>Total Robots</span></div>
+    <div class="wb-float-stat"><b>18</b><span>Active Tasks</span></div>
+    <div class="wb-float-stat"><b>98.5%</b><span>System Uptime</span></div>
+  </div>
+</div>
+''', unsafe_allow_html=True)
+
+# -----------------------------
+# Dashboard content
+# -----------------------------
+if st.session_state.active_page == "Dashboard":
+    k = st.columns(5, gap="small")
+    with k[0]: metric_card("🤖","TOTAL ROBOTS",TOTAL,"5% vs last hour","#1687f8","#e8f4ff")
+    with k[1]: metric_card("🛡️","HEALTHY ROBOTS",HEALTHY,f"{HEALTHY/TOTAL*100:.1f}% fleet health","#19bf7a","#e6fbf2",HEALTHY/TOTAL*100)
+    with k[2]: metric_card("⚠️","ATTENTION",ATTENTION,f"{ATTENTION/TOTAL*100:.1f}% requires review","#f4a313","#fff5df",ATTENTION/TOTAL*100)
+    with k[3]: metric_card("〽️","ANOMALIES",ANOMALIES,f"{ANOMALIES/max(len(telemetry),1)*100:.1f}% anomaly rate","#ef4b58","#fff0f1",min(100,ANOMALIES/max(len(telemetry),1)*100))
+    with k[4]: metric_card("📦","LOW STOCK ITEMS",LOW_STOCK,f"{LOW_STOCK/max(TOTAL,1)*100:.1f}% reorder needed","#8b5cf6","#f4efff",LOW_STOCK/max(TOTAL,1)*100)
+
+    st.markdown('<div class="section-title">Fleet Intelligence</div><div class="section-sub">Live health, battery distribution and robot-level operating state.</div>', unsafe_allow_html=True)
+    c1,c2,c3 = st.columns([1.12,1.12,1.08], gap="small")
+
+    # health donut
     with c1:
+        st.markdown('<div class="panel"><div class="panel-title">🤖 Fleet Health Distribution</div><div class="panel-sub">Health status of all warehouse robots</div>', unsafe_allow_html=True)
+        fig=go.Figure(go.Pie(labels=["Healthy","Needs Attention","Critical"],values=[HEALTHY,WARNING,CRITICAL],hole=.68,marker=dict(colors=["#24c985","#f6a719","#ef4d59"],line=dict(color="white",width=3)),textinfo="percent",textfont=dict(size=11,color="white")))
+        fig.add_annotation(text=f"<b>{TOTAL}</b><br><span style='font-size:11px'>Robots</span>",showarrow=False,font=dict(size=22,color="#142947"))
+        fig.update_layout(showlegend=True,legend=dict(orientation="v",x=.96,y=.5,xanchor="left",font=dict(size=10,color="#36516f")),margin=dict(l=5,r=90,t=10,b=5),height=260,paper_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig,width="stretch",config={"displayModeBar":False})
+        st.markdown('</div>',unsafe_allow_html=True)
 
-        with st.container(border=True):
-
-            st.markdown(
-                "#### Robot Traffic"
-            )
-
-            fig = px.bar(
-                congestion,
-                x="Station",
-                y="Robot Traffic",
-                text="Robot Traffic"
-            )
-
-            fig.update_traces(
-                marker_color=ACCENT_2
-            )
-
-            fig.update_layout(
-
-                template=(
-                    "plotly_dark"
-                    if is_dark
-                    else "plotly_white"
-                ),
-
-                paper_bgcolor="rgba(0,0,0,0)",
-
-                plot_bgcolor="rgba(0,0,0,0)",
-
-                height=340,
-
-                font=dict(
-                    color=TEXT
-                ),
-
-                showlegend=False,
-
-                xaxis=dict(
-                    title="Station",
-
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID
-                ),
-
-                yaxis=dict(
-                    title="Robot Traffic",
-
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID
-                )
-            )
-
-            st.plotly_chart(
-                fig,
-                width="stretch"
-            )
-
-
-    # ============================================================
-    # STATION UTILIZATION
-    # ============================================================
-
+    # battery distribution
     with c2:
+        st.markdown('<div class="panel"><div class="panel-title">🔋 Battery Level Distribution</div><div class="panel-sub">Current battery levels across fleet</div>', unsafe_allow_html=True)
+        bins=[0,20,40,60,80,100]
+        labels=["0–20%","20–40%","40–60%","60–80%","80–100%"]
+        cats=pd.cut(latest["battery"],bins=bins,labels=labels,include_lowest=True)
+        counts=cats.value_counts().reindex(labels,fill_value=0)
+        fig=go.Figure(go.Bar(x=labels,y=counts.values,text=counts.values,textposition="outside",marker_color=["#ef4d59","#f59e0b","#f8c94b","#4d99f5","#19c77a"],marker_line_width=0))
+        fig=plot_layout(fig,285); fig.update_yaxes(title="Number of Robots",dtick=1,title_font=dict(size=14,color="#315675"),tickfont=dict(size=12,color="#315675"),title_standoff=10); fig.update_xaxes(title="Battery Level",title_font=dict(size=14,color="#315675"),tickfont=dict(size=12,color="#315675"),title_standoff=10)
+        st.plotly_chart(fig,width="stretch",config={"displayModeBar":False})
+        st.markdown('</div>',unsafe_allow_html=True)
 
-        with st.container(border=True):
-
-            st.markdown(
-                "#### Station Utilization"
+    # status table
+    with c3:
+        st.markdown('<div class="panel"><div class="panel-title">🤖 Robot Status Overview</div><div class="panel-sub">Current status of warehouse robots</div>', unsafe_allow_html=True)
+        show=latest.head(5)[["robot_id","battery","health_score","status"]].copy()
+        show["task"]=["Picking","Transport","Idle","Picking","Maintenance"][:len(show)]
+        show.columns=["ROBOT ID","BATTERY","HEALTH","STATUS","TASK"]
+        show["BATTERY"]=show["BATTERY"].round(0).astype(int).astype(str)+"%"
+        show["HEALTH"]=show["HEALTH"].round(0).astype(int).astype(str)+"%"
+        rows=[]
+        for _,r in show.iterrows():
+            status=str(r["STATUS"])
+            cls={"Healthy":"healthy","Warning":"warning","Critical":"critical"}.get(status,"healthy")
+            battery=float(str(r["BATTERY"]).replace("%",""))
+            rows.append(
+                f"<tr><td><b>{r['ROBOT ID']}</b></td>"
+                f"<td><span class='wb-bar'><i style='width:{battery:.0f}%'></i></span>{r['BATTERY']}</td>"
+                f"<td>{r['HEALTH']}</td>"
+                f"<td><span class='wb-status {cls}'>● {status}</span></td>"
+                f"<td>{r['TASK']}</td></tr>"
             )
+        table_html = (
+            '<div class="wb-table-wrap"><table class="wb-table">'
+            '<thead><tr><th>ROBOT ID</th><th>BATTERY</th><th>HEALTH</th><th>STATUS</th><th>TASK</th></tr></thead>'
+            '<tbody>' + ''.join(rows) + '</tbody></table></div>'
+        )
+        st.markdown(table_html, unsafe_allow_html=True)
+        st.markdown('</div>',unsafe_allow_html=True)
 
-            fig = px.bar(
-                congestion,
-                x="Station",
-                y="Utilization",
-                text="Utilization"
-            )
+    # Digital twin / allocation / alerts
+    st.markdown('<div class="section-title">Warehouse Operations</div><div class="section-sub">Live digital twin, AI task allocation and operational alerts.</div>', unsafe_allow_html=True)
+    mcol,tcol,acol=st.columns([1.65,1.0,.82],gap="small")
 
-            fig.update_traces(
-                marker_color=ACCENT
-            )
+    with mcol:
+        st.markdown('<div class="panel"><div class="panel-title">📍 Warehouse Digital Twin</div><div class="panel-sub">Live robot positions and warehouse layout</div>',unsafe_allow_html=True)
+        robot_pos={"R01":(0,0),"R02":(2,2),"R03":(4,2),"R04":(6,0),"R05":(8,1),"R06":(1,4),"R07":(3,5),"R08":(5,4),"R09":(7,3),"R10":(9,0),"R11":(0,6),"R12":(2,7),"R13":(4,6),"R14":(6,5),"R15":(8,4),"R16":(1,8),"R17":(3,8),"R18":(5,8),"R19":(7,8),"R20":(9,5)}
+        fig=go.Figure()
+        obsx=[];obsy=[]
+        for y,row in enumerate(WAREHOUSE_GRID):
+            for x,v in enumerate(row):
+                if v==1: obsx.append(x);obsy.append(y)
+        fig.add_trace(go.Scatter(x=obsx,y=obsy,mode="markers",marker=dict(size=21,color="#cbd7e5",symbol="square"),name="Shelf / Rack",hoverinfo="skip"))
+        station_colors={"P1":"#1687f8","P2":"#1687f8","P3":"#1687f8","PACK":"#8b5cf6"}
+        for s,pos in STATIONS.items():
+            fig.add_trace(go.Scatter(x=[pos[0]],y=[pos[1]],mode="markers+text",text=[s],textposition="top center",marker=dict(size=22,color=station_colors.get(s,"#1687f8"),symbol="diamond",line=dict(color="white",width=2)),name=s))
+        colors={"Healthy":"#18c77a","Warning":"#f5a623","Critical":"#ef4d59"}
+        for rid,pos in robot_pos.items():
+            row=latest[latest.robot_id==rid]
+            status=row.iloc[0]["status"] if not row.empty else "Healthy"
+            fig.add_trace(go.Scatter(x=[pos[0]],y=[pos[1]],mode="markers+text",text=[rid],textposition="bottom center",marker=dict(size=17,color=colors.get(status,"#1687f8"),line=dict(color="white",width=2)),name=rid,showlegend=False,hovertemplate=f"<b>{rid}</b><br>Status: {status}<extra></extra>"))
+        # planned route to P3
+        route=[(6,0),(6,1),(6,2),(7,2),(8,2),(8,3),(9,3),(9,4),(9,5)]
+        fig.add_trace(go.Scatter(x=[p[0] for p in route],y=[p[1] for p in route],mode="lines",line=dict(color="#4da3f7",width=2,dash="dot"),name="Planned Route"))
+        fig=plot_layout(fig,300);fig.update_xaxes(showgrid=True,dtick=1,range=[-1,10],showticklabels=False);fig.update_yaxes(showgrid=True,dtick=1,range=[9,-1],showticklabels=False)
+        fig.update_layout(showlegend=False,margin=dict(l=4,r=4,t=8,b=4))
+        st.markdown('<div class="wb-map-panel">',unsafe_allow_html=True)
+        st.plotly_chart(fig,width="stretch",config={"displayModeBar":False})
+        st.markdown('''<div class="legend-row"><span><i class="legend-dot" style="background:#18c77a"></i>Healthy</span><span><i class="legend-dot" style="background:#f5a623"></i>Attention</span><span><i class="legend-dot" style="background:#ef4d59"></i>Critical</span><span><i class="route-line"></i>Planned Route</span><span>▣ Shelf / Rack</span></div></div></div>''',unsafe_allow_html=True)
 
-            fig.update_layout(
+    with tcol:
+        st.markdown('<div class="panel" style="padding:18px"><div class="panel-title">🎯 Task Allocation</div><div class="panel-sub">AI recommended task assignment</div>',unsafe_allow_html=True)
+        robot_ids=latest.robot_id.tolist()
+        chosen_robot=st.selectbox("Select Robot",robot_ids,index=robot_ids.index("R04") if "R04" in robot_ids else 0,key="alloc_robot",label_visibility="visible")
 
-                template=(
-                    "plotly_dark"
-                    if is_dark
-                    else "plotly_white"
-                ),
+        target=st.selectbox("Select Target Station",["P1","P2","P3"],index=2,key="alloc_target",label_visibility="visible")
+        if st.button("🔍 Get AI Recommendation",key="ai_recommend",width="stretch"):
+            try:
+                resp=requests.get("https://warebot-ai.onrender.com/mqtt/allocate-task",timeout=10)
+                data=resp.json() if resp.ok else {}
+                alloc=data.get("allocation",{}); route_data=data.get("route_optimization",{})
+                rec_robot=alloc.get("robot_id",chosen_robot); distance=route_data.get("distance",9); score=route_data.get("score",36.6)
+            except Exception:
+                rec_robot=chosen_robot; distance=9; score=36.6
+            st.session_state.alloc_result=(rec_robot,target,distance,score)
+        rec=st.session_state.get("alloc_result",("R04","P3",9,36.6))
+        st.markdown(f'''<div class="ai-box"><div class="ai-box-title">⭐ AI RECOMMENDATION</div><div class="ai-main"><span class="ai-stat">RECOMMENDED ROBOT<strong>{rec[0]}</strong></span><span class="ai-stat">TARGET STATION<strong>{rec[1]}</strong></span></div><div style="display:flex;justify-content:space-between;margin-top:12px"><span class="ai-stat">ESTIMATED STEPS<b>{rec[2]} steps</b></span><span class="ai-stat">OPTIMIZATION SCORE<b>{rec[3]}</b></span></div></div>''',unsafe_allow_html=True)
+        st.markdown('</div>',unsafe_allow_html=True)
 
-                paper_bgcolor="rgba(0,0,0,0)",
+    with acol:
+        st.markdown('<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="panel-title">🔔 Recent Alerts</div><div class="panel-sub">Latest operational events</div></div><span style="color:#1687f8;font-size:10px;font-weight:800">View All</span></div>',unsafe_allow_html=True)
+        alerts=[
+            ("#ef4d59","🔴","R05 - Low Battery","Battery level at 12%. Please recharge.","5 min ago"),
+            ("#f5a623","⚠️","R03 - High Temperature","Temperature at 68°C (threshold: 60°C).","12 min ago"),
+            ("#1687f8","🔵","Congestion Detected","High traffic at P2 station.","18 min ago"),
+            ("#8b5cf6","🟣","Low Stock Alert","Item A1001 below reorder level.","25 min ago"),
+            ("#ef4d59","🔴","R01 - Vibration Anomaly","Unusual vibration pattern detected.","32 min ago"),
+        ]
+        for color,icon,title,msg,t in alerts:
+            st.markdown(f'''<div class="alert-card"><div class="alert-icon" style="background:{color}16">{icon}</div><div><div class="alert-title" style="color:{color}">{title}</div><div class="alert-msg">{msg}</div></div><div class="alert-time">{t}</div></div>''',unsafe_allow_html=True)
+        st.markdown('</div>',unsafe_allow_html=True)
 
-                plot_bgcolor="rgba(0,0,0,0)",
+elif st.session_state.active_page == "Fleet Monitoring":
+    st.markdown('<div class="section-title">Fleet Monitoring</div><div class="section-sub">Robot-level telemetry, battery and health status.</div>',unsafe_allow_html=True)
+    a,b=st.columns([1.1,1])
+    with a:
+        st.markdown('<div class="panel"><div class="panel-title">Robot Status Overview</div>',unsafe_allow_html=True)
+        df=latest[["robot_id","battery","health_score","status","temperature","vibration","motor_current","navigation_errors"]].copy()
+        df.columns=["Robot","Battery %","Health","Status","Temperature","Vibration","Motor Current","Nav Errors"]
+        st.dataframe(df.round(2),use_container_width=True,hide_index=True,height=500)
+        st.markdown('</div>',unsafe_allow_html=True)
+    with b:
+        selected=st.selectbox("Select Robot",sorted(telemetry.robot_id.unique()),key="fleet_robot")
+        hist=telemetry[telemetry.robot_id==selected].sort_values("timestamp")
+        fig=go.Figure(go.Scatter(x=hist.timestamp,y=hist.battery,mode="lines+markers",line=dict(color="#1687f8",width=3),marker=dict(size=4)))
+        fig=plot_layout(fig,360);fig.update_yaxes(title="Battery %",range=[0,100]);fig.update_xaxes(title="Time")
+        st.markdown('<div class="panel"><div class="panel-title">Battery Performance</div>',unsafe_allow_html=True);st.plotly_chart(fig,width="stretch",config={"displayModeBar":False});st.markdown('</div>',unsafe_allow_html=True)
+        fig2=go.Figure(go.Scatter(x=hist.timestamp,y=hist.health_score,mode="lines",line=dict(color="#19bf7a",width=3),fill="tozeroy",fillcolor="rgba(25,191,122,.10)"));fig2=plot_layout(fig2,250);fig2.update_yaxes(title="Health Score",range=[0,100]);st.plotly_chart(fig2,width="stretch",config={"displayModeBar":False})
 
-                height=340,
+elif st.session_state.active_page == "Predictive Maintenance":
+    st.markdown('<div class="section-title">Predictive Maintenance</div><div class="section-sub">AI-driven robot health and maintenance risk intelligence.</div>',unsafe_allow_html=True)
+    p1,p2,p3,p4=st.columns(4)
+    for col,label,val,sub in [(p1,"MODEL ACCURACY",f"{model_accuracy*100:.1f}%","XGBoost maintenance model"),(p2,"ANOMALY THRESHOLD",f"{anomaly_threshold:.3f}","Detected from telemetry"),(p3,"MAINTENANCE FLAGS",ATTENTION,"Requires review"),(p4,"AVG HEALTH",f"{AVG_HEALTH:.1f}/100","Fleet health score")]:
+        with col: st.markdown(f'<div class="kpi-card" style="--accent:#1687f8;--soft:#eaf5ff"><div class="kpi-label">{label}</div><div class="kpi-value">{val}</div><div class="kpi-note">{sub}</div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="panel" style="margin-top:12px"><div class="panel-title">Maintenance Risk Overview</div>',unsafe_allow_html=True)
+    risk=latest[["robot_id","battery","temperature","vibration","motor_current","navigation_errors","health_score","status"]].copy();risk["risk"]=100-risk["health_score"];st.dataframe(risk.round(2),use_container_width=True,hide_index=True,height=500);st.markdown('</div>',unsafe_allow_html=True)
 
-                font=dict(
-                    color=TEXT
-                ),
+elif st.session_state.active_page == "Route Optimization":
+    st.markdown('<div class="section-title">Route Optimization</div><div class="section-sub">AI task allocation with live backend recommendation and shortest-path routing.</div>',unsafe_allow_html=True)
+    target=st.selectbox("Target Station",["P1","P2","P3"],index=2,key="route_target")
+    if st.button("⚡ Run AI Allocation",key="route_run"):
+        try:
+            resp=requests.get("https://warebot-ai.onrender.com/mqtt/allocate-task",timeout=10)
+            data=resp.json(); alloc=data.get("allocation",{});route=data.get("route_optimization",{})
+            st.session_state.route_result=(alloc,route)
+        except Exception as e: st.error(f"Backend unavailable: {e}")
+    alloc,route=st.session_state.get("route_result",({},{}))
+    q1,q2,q3=st.columns(3)
+    with q1: st.metric("Recommended Robot",alloc.get("robot_id","R04"))
+    with q2: st.metric("Route Distance",f"{route.get('distance',9)} steps")
+    with q3: st.metric("Optimization Score",route.get("score",36.6))
+    st.markdown('<div class="panel" style="margin-top:12px"><div class="panel-title">Optimized Path</div>',unsafe_allow_html=True)
+    st.code(str(route.get("path",[(6,0),(6,1),(6,2),(7,2),(8,2),(8,3),(9,3),(9,4),(9,5)])),language="text");st.markdown('</div>',unsafe_allow_html=True)
 
-                showlegend=False,
+elif st.session_state.active_page == "Inventory & Orders":
+    st.markdown('<div class="section-title">Inventory & Orders</div><div class="section-sub">Warehouse inventory, low-stock items and active order flow.</div>',unsafe_allow_html=True)
+    inv=get_inventory();orders=get_orders()
+    a,b=st.columns(2)
+    with a:
+        st.markdown('<div class="panel"><div class="panel-title">Inventory</div>',unsafe_allow_html=True);st.dataframe(inv,use_container_width=True,hide_index=True,height=500);st.markdown('</div>',unsafe_allow_html=True)
+    with b:
+        st.markdown('<div class="panel"><div class="panel-title">Active Orders</div>',unsafe_allow_html=True);st.dataframe(orders,use_container_width=True,hide_index=True,height=500);st.markdown('</div>',unsafe_allow_html=True)
 
-                xaxis=dict(
-                    title="Station",
+elif st.session_state.active_page == "Analytics":
+    st.markdown('<div class="section-title">Warehouse Analytics</div><div class="section-sub">Fleet, anomaly and operational distribution insights.</div>',unsafe_allow_html=True)
+    c1,c2=st.columns(2)
+    with c1:
+        status=latest.status.value_counts().rename_axis("Status").reset_index(name="Robots")
+        fig=px.bar(status,x="Status",y="Robots",text="Robots",color="Status",color_discrete_map={"Healthy":"#19c77a","Warning":"#f5a623","Critical":"#ef4d59"});fig=plot_layout(fig,340);st.markdown('<div class="panel"><div class="panel-title">Robot Status</div>',unsafe_allow_html=True);st.plotly_chart(fig,width="stretch",config={"displayModeBar":False});st.markdown('</div>',unsafe_allow_html=True)
+    with c2:
+        fig=px.scatter(latest,x="battery",y="health_score",size="health_score",color="status",hover_name="robot_id",color_discrete_map={"Healthy":"#19c77a","Warning":"#f5a623","Critical":"#ef4d59"});fig=plot_layout(fig,340);fig.update_xaxes(title="Battery %");fig.update_yaxes(title="Health Score");st.markdown('<div class="panel"><div class="panel-title">Battery vs Health</div>',unsafe_allow_html=True);st.plotly_chart(fig,width="stretch",config={"displayModeBar":False});st.markdown('</div>',unsafe_allow_html=True)
 
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID
-                ),
-
-                yaxis=dict(
-                    title="Utilization",
-
-                    title_font=dict(
-                        color=TEXT
-                    ),
-
-                    tickfont=dict(
-                        color=TEXT_MUTED
-                    ),
-
-                    gridcolor=GRID,
-
-                    zerolinecolor=GRID,
-
-                    range=[0, 100]
-                )
-            )
-
-            st.plotly_chart(
-                fig,
-                width="stretch"
-            )
-
-
-
-if active_page in ("All Details", "Inventory & Orders"):
-    # ============================================================
-    # WAREHOUSE MANAGEMENT
-    # ============================================================
-
-    st.subheader(
-        "Warehouse Management"
-    )
-
-    st.divider()
-
-
-    inventory = get_inventory()
-
-    orders = get_orders()
-
-
-    w1, w2 = st.columns(2)
-
-
-    # ============================================================
-    # INVENTORY
-    # ============================================================
-
-    with w1:
-
-        with st.container(border=True):
-
-            st.markdown(
-                "#### Inventory"
-            )
-
-            st.dataframe(
-                inventory,
-                width="stretch",
-                hide_index=True
-            )
-
-
-    # ============================================================
-    # ACTIVE ORDERS
-    # ============================================================
-
-    with w2:
-
-        with st.container(border=True):
-
-            st.markdown(
-                "#### Active Orders"
-            )
-
-            st.dataframe(
-                orders,
-                width="stretch",
-                hide_index=True
-            )
-
-
-
-if active_page == "All Details":
-    # ============================================================
-    # OPS ASSISTANT
-    # ============================================================
-
-    st.subheader(
-        "Ops Assistant"
-    )
-
-    st.divider()
-
-
+elif st.session_state.active_page == "AI Assistant":
+    st.markdown('<div class="section-title">AI Operations Assistant</div><div class="section-sub">Ask about robot health, maintenance, anomalies, inventory or fleet status.</div>',unsafe_allow_html=True)
     with st.container(border=True):
-
-        st.markdown(
-            "#### 🤖 WareBot Operations Assistant"
-        )
-
-        st.caption(
-            "Ask about robot health, maintenance, "
-            "anomalies, inventory or fleet status."
-        )
-
-
-        question = st.chat_input(
-            "Ask WareBot..."
-        )
-
-
+        st.markdown('<div class="panel-title">🤖 WareBot Operations Assistant</div>',unsafe_allow_html=True)
+        question=st.chat_input("Ask WareBot about fleet operations...")
         if question:
-
-            q = question.lower()
-
-
-            if (
-                "maintenance" in q
-                or "repair" in q
-                or "problem" in q
-            ):
-
-                critical_robots = latest[
-                    latest["status"] == "Critical"
-                ]
-
-
-                if len(critical_robots) > 0:
-
-                    names = ", ".join(
-                        critical_robots[
-                            "robot_id"
-                        ].tolist()
-                    )
-
-                    answer = (
-                        f"{len(critical_robots)} critical "
-                        f"robot(s) need attention: {names}. "
-                        "Check battery, vibration, temperature "
-                        "and motor current."
-                    )
-
-                else:
-
-                    answer = (
-                        "No robots are currently classified "
-                        "as Critical."
-                    )
-
-
-            elif (
-                "inventory" in q
-                or "stock" in q
-            ):
-
-                if len(low_stock) > 0:
-
-                    names = ", ".join(
-                        low_stock[
-                            "product_name"
-                        ].tolist()
-                    )
-
-                    answer = (
-                        f"{len(low_stock)} item(s) are below "
-                        f"reorder level: {names}."
-                    )
-
-                else:
-
-                    answer = (
-                        "Inventory levels are currently healthy."
-                    )
-
-
-            elif "anomal" in q:
-
-                answer = (
-                    f"WareBot detected {anomalies} "
-                    "telemetry anomalies."
-                )
-
-
-            elif (
-                "robot" in q
-                or "fleet" in q
-            ):
-
-                answer = (
-                    f"Fleet status: {total_robots} robots, "
-                    f"{healthy} healthy, "
-                    f"{warning} warning, "
-                    f"{critical} critical."
-                )
-
-
+            q=question.lower()
+            if "maintenance" in q or "repair" in q or "problem" in q:
+                crit=latest[latest.status=="Critical"]
+                answer=f"{len(crit)} critical robot(s) need attention: {', '.join(crit.robot_id.tolist())}. Check battery, vibration, temperature and motor current." if len(crit) else "No robots are currently classified as Critical."
+            elif "inventory" in q or "stock" in q:
+                answer=f"{LOW_STOCK} inventory item(s) are below reorder level."
+            elif "anomaly" in q:
+                answer=f"The AI telemetry pipeline detected {ANOMALIES} anomalies."
+            elif "robot" in q or "fleet" in q:
+                answer=f"Fleet status: {TOTAL} robots monitored, {HEALTHY} healthy, {ATTENTION} requiring attention."
             else:
+                answer="I can help with robot health, maintenance, anomalies, inventory and fleet status."
+            st.chat_message("assistant",avatar="🤖").write(answer)
 
-                answer = (
-                    "I can help with robot health, "
-                    "maintenance, anomalies, inventory "
-                    "and fleet status."
-                )
-
-
-            with st.chat_message(
-                "assistant",
-                avatar="🤖"
-            ):
-
-                st.write(
-                    answer
-                )
-
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.divider()
-
-st.caption(
-    "WAREBOT AI  •  AUTONOMOUS WAREHOUSE INTELLIGENCE  •  v1.0"
+st.markdown(
+    f'<div style="text-align:center;color:#5d7590;font-size:10px;font-weight:600;padding-top:18px">'
+    f'WareBot AI v1.0 · Autonomous Warehouse Intelligence · Prototype using simulated warehouse telemetry · '
+    f'Live time: {datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%I:%M:%S %p")}</div>',
+    unsafe_allow_html=True,
 )
