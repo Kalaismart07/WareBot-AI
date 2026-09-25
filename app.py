@@ -122,8 +122,30 @@ header[data-testid="stHeader"]{display:none!important;}
 .refresh-row{display:none;}
 
 /* hero */
-.wb-hero{height:220px;border-radius:24px;overflow:hidden;position:relative;background:#dff0ff url('https://images.unsplash.com/photo-1586528116493-da8c2f5b8a7f?auto=format&fit=crop&w=1800&q=90') center/cover no-repeat;box-shadow:0 14px 38px rgba(41,100,154,.14);border:1px solid #d6e8f8;margin-bottom:14px;}
-.wb-hero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,.98) 0%,rgba(255,255,255,.93) 30%,rgba(255,255,255,.60) 49%,rgba(255,255,255,.12) 76%,rgba(255,255,255,.02) 100%);}
+.wb-hero{
+    height:220px;
+    border-radius:24px;
+    overflow:hidden;
+    position:relative;
+    background:
+        url('https://www.atpress.ne.jp/releases/219292/LL_img_219292_2.png')
+        center/cover no-repeat;
+    box-shadow:0 14px 38px rgba(41,100,154,.14);
+    border:1px solid #d6e8f8;
+    margin-bottom:14px;
+}
+.wb-hero:before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(
+        90deg,
+        rgba(255,255,255,.90) 0%,
+        rgba(255,255,255,.68) 32%,
+        rgba(255,255,255,.30) 58%,
+        rgba(255,255,255,.08) 100%
+    );
+}
 .wb-hero-copy{position:absolute;left:34px;top:28px;max-width:680px;z-index:2;}
 .wb-eyebrow{color:#0985e9;font-size:12px;letter-spacing:1.6px;font-weight:900;margin-bottom:7px;}
 .wb-hero-title{font-size:48px;line-height:.98;font-weight:950;letter-spacing:-2.1px;color:#10264b;margin-bottom:10px;}
@@ -643,6 +665,479 @@ div[data-testid="stSelectbox"] [data-baseweb="select"] svg {
     opacity: 1 !important;
 }
 
+
+/* ============================================================
+   WAREBOT BLUE PREMIUM HERO
+   Original blue UI preserved — background image only
+   ============================================================ */
+.wb-nav-shell{height:82px!important;border-radius:24px!important;background:rgba(255,255,255,.96)!important;border:1px solid #d9e7f4!important;box-shadow:0 14px 40px rgba(34,91,142,.10)!important;padding:9px 16px!important;}
+.wb-logo{width:52px!important;height:52px!important;border-radius:16px!important;background:linear-gradient(145deg,#dcefff,#eef8ff)!important;box-shadow:0 8px 20px rgba(22,135,248,.12)!important;}
+.wb-brand-title{font-size:25px!important;color:#10244a!important;}
+.wb-brand-title span{color:#1687f8!important;}
+.wb-brand-sub{color:#5d7898!important;font-size:10px!important;}
+.wb-live{background:#f1fff9!important;border-color:#bfeedd!important;color:#087c50!important;min-width:145px!important;padding:11px 16px!important;}
+.wb-date{border-left-color:#dce8f5!important;color:#4d6685!important;}
+.wb-nav-buttons .stButton>button{color:#1e3b63!important;border-radius:999px!important;font-size:10px!important;font-weight:800!important;}
+.wb-nav-buttons .stButton>button:hover{background:#edf6ff!important;color:#0876e7!important;border-color:#d5e8f8!important;}
+.wb-nav-buttons.active .stButton>button{background:linear-gradient(135deg,#1687f8,#0876e7)!important;border-color:#1687f8!important;color:white!important;box-shadow:0 8px 20px rgba(22,135,248,.22)!important;}
+.wb-hero{height:250px!important;border-radius:26px!important;margin-bottom:8px!important;border:1px solid #d6e8f8!important;background:url('https://www.atpress.ne.jp/releases/219292/LL_img_219292_2.png') center/cover no-repeat!important;box-shadow:0 18px 45px rgba(37,91,142,.13)!important;}
+.wb-hero:before{background:linear-gradient(90deg,rgba(244,249,255,.97) 0%,rgba(244,249,255,.90) 27%,rgba(244,249,255,.62) 48%,rgba(244,249,255,.20) 72%,rgba(244,249,255,.04) 100%)!important;}
+.wb-hero-copy{left:42px!important;top:38px!important;max-width:730px!important;}
+.wb-eyebrow{color:#0876d8!important;letter-spacing:2px!important;font-size:11px!important;}
+.wb-hero-title{font-size:52px!important;letter-spacing:-2.5px!important;color:#10244a!important;}
+.wb-hero-title span{color:#1687f8!important;}
+.wb-hero-sub{color:#416384!important;font-size:14px!important;max-width:700px!important;}
+.wb-fleet-float{right:24px!important;bottom:22px!important;border-radius:20px!important;border-color:rgba(214,229,243,.95)!important;box-shadow:0 15px 35px rgba(39,91,142,.15)!important;}
+.wb-fleet-dot{background:#19c77a!important;}
+.kpi-card{border-radius:20px!important;border-color:#d9e8f4!important;box-shadow:0 12px 32px rgba(38,91,142,.075)!important;}
+.kpi-card:hover{box-shadow:0 18px 38px rgba(38,91,142,.13)!important;}
+.section-title{color:#132744!important;font-size:22px!important;}
+.section-sub{color:#71849c!important;}
+.panel{border-radius:20px!important;border-color:#d9e8f4!important;box-shadow:0 11px 30px rgba(38,91,142,.065)!important;}
+.panel-title{color:#142947!important;}
+[data-testid="stSelectbox"]>div>div{border-radius:13px!important;border-color:#b9d1e7!important;}
+
+
+
+/* FINAL RADIO TEXT VISIBILITY FIX */
+div[data-testid="stRadio"] label,
+div[data-testid="stRadio"] label *,
+div[data-testid="stRadio"] [role="radio"] + div,
+div[data-testid="stRadio"] [role="radio"] ~ div,
+div[data-testid="stRadio"] p,
+div[data-testid="stRadio"] span {
+    color:#173858 !important;
+    -webkit-text-fill-color:#173858 !important;
+    opacity:1 !important;
+    visibility:visible !important;
+    text-shadow:none !important;
+    font-weight:750 !important;
+}
+
+div[data-testid="stRadio"] label > div:last-child,
+div[data-testid="stRadio"] label > div:last-child * {
+    color:#173858 !important;
+    -webkit-text-fill-color:#173858 !important;
+    opacity:1 !important;
+    visibility:visible !important;
+}
+
+div[data-testid="stRadio"] [role="radio"] {
+    opacity:1 !important;
+}
+
+div[data-testid="stRadio"] [role="radio"][aria-checked="true"] {
+    opacity:1 !important;
+}
+
+
+/* PREMIUM AI RECOMMENDATION CARD */
+.ai-box{
+    background:linear-gradient(145deg,#fffdf7 0%,#fff7df 100%) !important;
+    border:1px solid #f3d58a !important;
+    border-radius:20px !important;
+    padding:18px !important;
+    box-shadow:0 10px 28px rgba(214,164,55,.12) !important;
+}
+
+.ai-box-title{
+    color:#c47a00 !important;
+    font-weight:900 !important;
+    font-size:16px !important;
+    margin-bottom:14px !important;
+}
+
+.ai-main{
+    background:#ffffff !important;
+    border:1px solid #f0dfb4 !important;
+    border-radius:14px !important;
+    padding:15px 14px !important;
+}
+
+.ai-stat{
+    color:#58708d !important;
+    font-size:11px !important;
+    font-weight:800 !important;
+    letter-spacing:.2px !important;
+}
+
+.ai-main .ai-stat{
+    width:48% !important;
+}
+
+.ai-main strong{
+    display:block !important;
+    margin-top:5px !important;
+    font-size:20px !important;
+    line-height:1.1 !important;
+    color:#132947 !important;
+    font-weight:900 !important;
+}
+
+
+/* ROUTE OPTIMIZATION METRIC VISIBILITY */
+[data-testid="stMetric"] {
+    background:#ffffff !important;
+    border:1px solid #d6e8f8 !important;
+    border-radius:16px !important;
+    opacity:1 !important;
+}
+
+[data-testid="stMetricLabel"] {
+    color:#58708d !important;
+    -webkit-text-fill-color:#58708d !important;
+    opacity:1 !important;
+    font-weight:800 !important;
+}
+
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] *,
+[data-testid="stMetricValue"] div {
+    color:#132947 !important;
+    -webkit-text-fill-color:#132947 !important;
+    opacity:1 !important;
+    visibility:visible !important;
+    font-weight:900 !important;
+}
+
+
+/* OPTIMIZED PATH CODE BOX ALIGNMENT */
+[data-testid="stCodeBlock"] {
+    margin-top:0 !important;
+}
+
+[data-testid="stCodeBlock"] pre {
+    margin:0 !important;
+    padding:12px 16px !important;
+    line-height:1.35 !important;
+    font-size:14px !important;
+    box-sizing:border-box !important;
+}
+
+[data-testid="stCodeBlock"] code {
+    padding:0 !important;
+    margin:0 !important;
+}
+
+
+/* AI ASSISTANT CHAT UI */
+div[data-testid="stChatInput"] {
+    background:#ffffff !important;
+    border:1px solid #cfe2f5 !important;
+    border-radius:14px !important;
+    box-shadow:0 4px 14px rgba(31,105,170,.08) !important;
+}
+
+div[data-testid="stChatInput"] textarea {
+    background:#ffffff !important;
+    color:#173858 !important;
+    -webkit-text-fill-color:#173858 !important;
+    caret-color:#1687f8 !important;
+    font-size:15px !important;
+    font-weight:600 !important;
+}
+
+div[data-testid="stChatInput"] textarea::placeholder {
+    color:#71859b !important;
+    -webkit-text-fill-color:#71859b !important;
+    opacity:1 !important;
+}
+
+div[data-testid="stChatInput"] button {
+    background:#1687f8 !important;
+    color:#ffffff !important;
+    border-radius:10px !important;
+}
+
+div[data-testid="stChatMessage"] {
+    background:#ffffff !important;
+    border:1px solid #d7e8f8 !important;
+    border-radius:14px !important;
+    color:#173858 !important;
+}
+
+div[data-testid="stChatMessage"] p,
+div[data-testid="stChatMessage"] span,
+div[data-testid="stChatMessage"] div {
+    color:#173858 !important;
+    -webkit-text-fill-color:#173858 !important;
+    opacity:1 !important;
+}
+
+
+/* FINAL AI CHAT WHITE UI */
+div[data-testid="stChatInput"],
+div[data-testid="stChatInput"] > div,
+div[data-testid="stChatInput"] form {
+    background:#ffffff !important;
+    border:1px solid #cfe2f5 !important;
+    border-radius:14px !important;
+    box-shadow:0 3px 12px rgba(31,105,170,.06) !important;
+}
+
+div[data-testid="stChatInput"] textarea {
+    background:#ffffff !important;
+    color:#173858 !important;
+    -webkit-text-fill-color:#173858 !important;
+    caret-color:#1687f8 !important;
+}
+
+div[data-testid="stChatInput"] textarea::placeholder {
+    color:#71859b !important;
+    -webkit-text-fill-color:#71859b !important;
+    opacity:1 !important;
+}
+
+div[data-testid="stChatMessage"] {
+    background:#ffffff !important;
+    border:1px solid #d6e8f8 !important;
+    border-radius:14px !important;
+    box-shadow:0 3px 12px rgba(31,105,170,.05) !important;
+}
+
+div[data-testid="stChatMessage"] p,
+div[data-testid="stChatMessage"] span {
+    color:#173858 !important;
+    -webkit-text-fill-color:#173858 !important;
+}
+
+
+/* =========================================================
+   FINAL PREMIUM HEADER NAVIGATION
+   ========================================================= */
+
+.wb-nav-buttons {
+    position:relative !important;
+    margin:0 4px 24px !important;
+    overflow:visible !important;
+}
+
+.wb-nav-buttons .stButton {
+    width:100% !important;
+}
+
+.wb-nav-buttons .stButton > button {
+    min-height:48px !important;
+    height:48px !important;
+    padding:0 14px !important;
+    border:1px solid #d7e6f4 !important;
+    border-radius:999px !important;
+    background:rgba(255,255,255,.96) !important;
+    color:#173858 !important;
+    -webkit-text-fill-color:#173858 !important;
+    font-size:12px !important;
+    font-weight:800 !important;
+    box-shadow:0 5px 15px rgba(39,91,142,.07) !important;
+    transition:all .22s ease !important;
+}
+
+.wb-nav-buttons .stButton > button:hover {
+    background:#edf7ff !important;
+    color:#0876e7 !important;
+    -webkit-text-fill-color:#0876e7 !important;
+    border-color:#b9dafa !important;
+    transform:translateY(-2px) !important;
+    box-shadow:0 8px 20px rgba(22,135,248,.14) !important;
+}
+
+/* SELECTED PAGE */
+.wb-nav-buttons.active .stButton > button {
+    background:linear-gradient(135deg,#1687f8,#0876e7) !important;
+    color:#ffffff !important;
+    -webkit-text-fill-color:#ffffff !important;
+    border-color:#1687f8 !important;
+    box-shadow:
+        0 10px 24px rgba(22,135,248,.28),
+        0 0 0 3px rgba(22,135,248,.08) !important;
+    transform:translateY(-1px) !important;
+}
+
+.wb-nav-buttons.active .stButton > button:hover {
+    background:linear-gradient(135deg,#1687f8,#0876e7) !important;
+    color:#ffffff !important;
+    -webkit-text-fill-color:#ffffff !important;
+}
+
+/* CURRENT VIEW BADGE */
+.wb-nav-buttons.active::after {
+    content:"CURRENT VIEW";
+    position:absolute;
+    left:50%;
+    top:54px;
+    transform:translateX(-50%);
+    background:#eaf6ff;
+    color:#1687f8;
+    border:1px solid #b9dcfa;
+    border-radius:999px;
+    padding:4px 11px;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.5px;
+    white-space:nowrap;
+    box-shadow:0 5px 14px rgba(22,135,248,.12);
+    z-index:20;
+}
+
+/* SMALL BLUE POINTER */
+.wb-nav-buttons.active::before {
+    content:"";
+    position:absolute;
+    left:50%;
+    top:48px;
+    transform:translateX(-50%);
+    width:0;
+    height:0;
+    border-left:6px solid transparent;
+    border-right:6px solid transparent;
+    border-bottom:6px solid #eaf6ff;
+    z-index:21;
+}
+
+/* BRAND */
+.wb-brand-title {
+    font-size:25px !important;
+    font-weight:950 !important;
+    letter-spacing:-.7px !important;
+}
+
+.wb-logo {
+    width:52px !important;
+    height:52px !important;
+    border-radius:16px !important;
+    box-shadow:0 8px 22px rgba(22,135,248,.12) !important;
+}
+
+/* LIVE STATUS */
+.wb-live {
+    min-width:145px !important;
+    padding:11px 16px !important;
+    box-shadow:0 7px 18px rgba(25,199,122,.08) !important;
+}
+
+
+/* FINAL WHITE FLEET TABLE */
+.wb-fleet-table-wrap {
+    background:#ffffff !important;
+    border:1px solid #d7e6f4 !important;
+    border-radius:12px !important;
+    overflow:hidden !important;
+    box-shadow:0 5px 18px rgba(31,105,170,.06) !important;
+}
+
+.wb-fleet-table {
+    width:100% !important;
+    border-collapse:collapse !important;
+    background:#ffffff !important;
+    color:#173858 !important;
+    font-size:13px !important;
+}
+
+.wb-fleet-table th {
+    background:#f7fbff !important;
+    color:#526b84 !important;
+    font-weight:800 !important;
+    text-align:left !important;
+    padding:11px 10px !important;
+    border-bottom:1px solid #dce9f5 !important;
+}
+
+.wb-fleet-table td {
+    background:#ffffff !important;
+    color:#173858 !important;
+    padding:10px !important;
+    border-bottom:1px solid #e8f0f7 !important;
+}
+
+.wb-fleet-table tbody tr:hover td {
+    background:#f7fbff !important;
+}
+
+.wb-fleet-table td.healthy {
+    color:#159b68 !important;
+    font-weight:700 !important;
+}
+
+.wb-fleet-table td.critical {
+    color:#ef4d59 !important;
+    font-weight:800 !important;
+}
+
+
+
+/* FINAL WHITE DATA TABLES */
+[data-testid="stDataFrame"] {
+    background:#ffffff !important;
+    border:1px solid #d7e6f4 !important;
+    border-radius:12px !important;
+    overflow:hidden !important;
+}
+
+[data-testid="stDataFrame"] [role="grid"] {
+    background:#ffffff !important;
+    color:#173858 !important;
+}
+
+[data-testid="stDataFrame"] [role="columnheader"] {
+    background:#f7fbff !important;
+    color:#526b84 !important;
+    border-color:#dce9f5 !important;
+}
+
+[data-testid="stDataFrame"] [role="gridcell"] {
+    background:#ffffff !important;
+    color:#173858 !important;
+    border-color:#e5eef6 !important;
+}
+
+[data-testid="stDataFrame"] canvas {
+    background:#ffffff !important;
+}
+
+
+/* REAL WHITE HTML DATA TABLES */
+.wb-white-table-box{
+    width:100%;
+    max-height:500px;
+    overflow:auto;
+    background:#ffffff !important;
+    border:1px solid #d7e6f4;
+    border-radius:12px;
+    box-shadow:0 5px 18px rgba(31,105,170,.06);
+}
+
+.wb-white-html-table{
+    width:100%;
+    border-collapse:collapse;
+    background:#ffffff !important;
+    color:#173858 !important;
+    font-size:13px;
+}
+
+.wb-white-html-table thead th{
+    position:sticky;
+    top:0;
+    z-index:2;
+    background:#f5faff !important;
+    color:#526b84 !important;
+    font-weight:800;
+    text-align:left;
+    padding:11px 10px;
+    border-bottom:1px solid #dce9f5;
+    white-space:nowrap;
+}
+
+.wb-white-html-table tbody td{
+    background:#ffffff !important;
+    color:#173858 !important;
+    padding:10px;
+    border-bottom:1px solid #e7eef5;
+    white-space:nowrap;
+}
+
+.wb-white-html-table tbody tr:hover td{
+    background:#f7fbff !important;
+}
+
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -732,25 +1227,46 @@ with nav_cols[-1]:
 # -----------------------------
 # Hero
 # -----------------------------
-st.markdown('''
+st.markdown(f'''
 <div class="wb-hero">
   <div class="wb-hero-copy">
-    <div class="wb-eyebrow">WAREBOT AI · AUTONOMOUS WAREHOUSE OPERATIONS</div>
-    <div class="wb-hero-title">Smart Warehouse <span>Robotics Platform</span></div>
-    <div class="wb-hero-sub">Real-time fleet monitoring · Predictive maintenance · AI task allocation · Inventory flow intelligence · Optimized warehouse operations</div>
+    <div class="wb-eyebrow">WAREBOT AI · WAREHOUSE OPERATIONS</div>
+    <div class="wb-hero-title">Warehouse <span>Intelligence</span></div>
+    <div class="wb-hero-sub">Real-time fleet health, predictive maintenance, AI task allocation and optimized inventory flow for autonomous warehouse robotics.</div>
   </div>
   <div class="wb-fleet-float">
-    <div class="wb-fleet-online"><span class="wb-fleet-dot"></span>FLEET ONLINE<small>All robots operational</small></div>
-    <div class="wb-float-stat"><b>20</b><span>Total Robots</span></div>
-    <div class="wb-float-stat"><b>18</b><span>Active Tasks</span></div>
-    <div class="wb-float-stat"><b>98.5%</b><span>System Uptime</span></div>
+    <div class="wb-fleet-online"><span class="wb-fleet-dot"></span>SYSTEM OPERATIONAL<small>20 robots monitored</small></div>
+    <div class="wb-float-stat"><b>20</b><span>Robots</span></div>
+    <div class="wb-float-stat"><b>{HEALTHY}</b><span>Healthy</span></div>
+    <div class="wb-float-stat"><b>{ANOMALIES}</b><span>Anomalies</span></div>
   </div>
 </div>
+<div style="margin:-1px 0 14px;border:1px solid #e5dcae;background:#fff8df;border-radius:13px;padding:9px 14px;color:#806d35;font-size:10px;font-weight:750;box-shadow:0 5px 15px rgba(120,105,55,.05)">⚠️ DEMO MODE · Warehouse telemetry, robot positions and WMS records are simulated for project demonstration.</div>
 ''', unsafe_allow_html=True)
 
 # -----------------------------
 # Dashboard content
 # -----------------------------
+# WHITE HTML TABLE HELPER
+def white_data_table(df, height=500):
+    table_html = df.to_html(
+        index=False,
+        classes="wb-white-html-table",
+        border=0
+    )
+
+    st.markdown(
+        f"""
+        <div class="wb-white-table-box" style="max-height:{height}px;">
+            {table_html}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+
+
 if st.session_state.active_page == "Dashboard":
     k = st.columns(5, gap="small")
     with k[0]: metric_card("🤖","TOTAL ROBOTS",TOTAL,"5% vs last hour","#1687f8","#e8f4ff")
@@ -823,7 +1339,7 @@ if st.session_state.active_page == "Dashboard":
         for y,row in enumerate(WAREHOUSE_GRID):
             for x,v in enumerate(row):
                 if v==1: obsx.append(x);obsy.append(y)
-        fig.add_trace(go.Scatter(x=obsx,y=obsy,mode="markers",marker=dict(size=21,color="#cbd7e5",symbol="square"),name="Shelf / Rack",hoverinfo="skip"))
+        fig.add_trace(go.Scatter(x=obsx,y=obsy,mode="markers",marker=dict(size=23,color="#b8c9dc",symbol="square",line=dict(color="#9fb5cc",width=1)),name="Shelf / Rack",hoverinfo="skip"))
         station_colors={"P1":"#1687f8","P2":"#1687f8","P3":"#1687f8","PACK":"#8b5cf6"}
         for s,pos in STATIONS.items():
             fig.add_trace(go.Scatter(x=[pos[0]],y=[pos[1]],mode="markers+text",text=[s],textposition="top center",marker=dict(size=22,color=station_colors.get(s,"#1687f8"),symbol="diamond",line=dict(color="white",width=2)),name=s))
@@ -834,7 +1350,7 @@ if st.session_state.active_page == "Dashboard":
             fig.add_trace(go.Scatter(x=[pos[0]],y=[pos[1]],mode="markers+text",text=[rid],textposition="bottom center",marker=dict(size=17,color=colors.get(status,"#1687f8"),line=dict(color="white",width=2)),name=rid,showlegend=False,hovertemplate=f"<b>{rid}</b><br>Status: {status}<extra></extra>"))
         # planned route to P3
         route=[(6,0),(6,1),(6,2),(7,2),(8,2),(8,3),(9,3),(9,4),(9,5)]
-        fig.add_trace(go.Scatter(x=[p[0] for p in route],y=[p[1] for p in route],mode="lines",line=dict(color="#4da3f7",width=2,dash="dot"),name="Planned Route"))
+        fig.add_trace(go.Scatter(x=[p[0] for p in route],y=[p[1] for p in route],mode="lines",line=dict(color="#1687f8",width=4,dash="dot"),name="Planned Route"))
         fig=plot_layout(fig,300);fig.update_xaxes(showgrid=True,dtick=1,range=[-1,10],showticklabels=False);fig.update_yaxes(showgrid=True,dtick=1,range=[9,-1],showticklabels=False)
         fig.update_layout(showlegend=False,margin=dict(l=4,r=4,t=8,b=4))
         st.markdown('<div class="wb-map-panel">',unsafe_allow_html=True)
@@ -844,9 +1360,9 @@ if st.session_state.active_page == "Dashboard":
     with tcol:
         st.markdown('<div class="panel" style="padding:18px"><div class="panel-title">🎯 Task Allocation</div><div class="panel-sub">AI recommended task assignment</div>',unsafe_allow_html=True)
         robot_ids=latest.robot_id.tolist()
-        chosen_robot=st.selectbox("Select Robot",robot_ids,index=robot_ids.index("R04") if "R04" in robot_ids else 0,key="alloc_robot",label_visibility="visible")
+        chosen_robot=st.radio("Select Robot",robot_ids,index=robot_ids.index("R04") if "R04" in robot_ids else 0,key="alloc_robot",label_visibility="visible",horizontal=True)
 
-        target=st.selectbox("Select Target Station",["P1","P2","P3"],index=2,key="alloc_target",label_visibility="visible")
+        target=st.radio("Select Target Station",["P1","P2","P3"],index=2,key="alloc_target",label_visibility="visible",horizontal=True)
         if st.button("🔍 Get AI Recommendation",key="ai_recommend",width="stretch"):
             try:
                 resp=requests.get("https://warebot-ai.onrender.com/mqtt/allocate-task",timeout=10)
@@ -880,15 +1396,54 @@ elif st.session_state.active_page == "Fleet Monitoring":
         st.markdown('<div class="panel"><div class="panel-title">Robot Status Overview</div>',unsafe_allow_html=True)
         df=latest[["robot_id","battery","health_score","status","temperature","vibration","motor_current","navigation_errors"]].copy()
         df.columns=["Robot","Battery %","Health","Status","Temperature","Vibration","Motor Current","Nav Errors"]
-        st.dataframe(df.round(2),use_container_width=True,hide_index=True,height=500)
+        table_rows = ""
+        for _, row in df.round(2).iterrows():
+            status = str(row["Status"])
+            status_class = "critical" if status == "Critical" else "healthy"
+
+            table_rows += f"""
+            <tr>
+                <td>{row["Robot"]}</td>
+                <td>{row["Battery %"]}</td>
+                <td>{row["Health"]}</td>
+                <td class="{status_class}">{status}</td>
+                <td>{row["Temperature"]}</td>
+                <td>{row["Vibration"]}</td>
+                <td>{row["Motor Current"]}</td>
+                <td>{row["Nav Errors"]}</td>
+            </tr>
+            """
+
+        st.html(f"""
+        <div class="wb-fleet-table-wrap">
+            <table class="wb-fleet-table">
+                <thead>
+                    <tr>
+                        <th>Robot</th>
+                        <th>Battery %</th>
+                        <th>Health</th>
+                        <th>Status</th>
+                        <th>Temperature</th>
+                        <th>Vibration</th>
+                        <th>Motor Current</th>
+                        <th>Nav Errors</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {table_rows}
+                </tbody>
+            </table>
+        </div>
+        """)
         st.markdown('</div>',unsafe_allow_html=True)
     with b:
-        selected=st.selectbox("Select Robot",sorted(telemetry.robot_id.unique()),key="fleet_robot")
+        selected=st.radio("Select Robot",sorted(telemetry.robot_id.unique()),index=0,key="fleet_robot",horizontal=True)
         hist=telemetry[telemetry.robot_id==selected].sort_values("timestamp")
         fig=go.Figure(go.Scatter(x=hist.timestamp,y=hist.battery,mode="lines+markers",line=dict(color="#1687f8",width=3),marker=dict(size=4)))
         fig=plot_layout(fig,360);fig.update_yaxes(title="Battery %",range=[0,100]);fig.update_xaxes(title="Time")
         st.markdown('<div class="panel"><div class="panel-title">Battery Performance</div>',unsafe_allow_html=True);st.plotly_chart(fig,width="stretch",config={"displayModeBar":False});st.markdown('</div>',unsafe_allow_html=True)
         fig2=go.Figure(go.Scatter(x=hist.timestamp,y=hist.health_score,mode="lines",line=dict(color="#19bf7a",width=3),fill="tozeroy",fillcolor="rgba(25,191,122,.10)"));fig2=plot_layout(fig2,250);fig2.update_yaxes(title="Health Score",range=[0,100]);st.plotly_chart(fig2,width="stretch",config={"displayModeBar":False})
+
 
 elif st.session_state.active_page == "Predictive Maintenance":
     st.markdown('<div class="section-title">Predictive Maintenance</div><div class="section-sub">AI-driven robot health and maintenance risk intelligence.</div>',unsafe_allow_html=True)
@@ -896,11 +1451,11 @@ elif st.session_state.active_page == "Predictive Maintenance":
     for col,label,val,sub in [(p1,"MODEL ACCURACY",f"{model_accuracy*100:.1f}%","XGBoost maintenance model"),(p2,"ANOMALY THRESHOLD",f"{anomaly_threshold:.3f}","Detected from telemetry"),(p3,"MAINTENANCE FLAGS",ATTENTION,"Requires review"),(p4,"AVG HEALTH",f"{AVG_HEALTH:.1f}/100","Fleet health score")]:
         with col: st.markdown(f'<div class="kpi-card" style="--accent:#1687f8;--soft:#eaf5ff"><div class="kpi-label">{label}</div><div class="kpi-value">{val}</div><div class="kpi-note">{sub}</div></div>',unsafe_allow_html=True)
     st.markdown('<div class="panel" style="margin-top:12px"><div class="panel-title">Maintenance Risk Overview</div>',unsafe_allow_html=True)
-    risk=latest[["robot_id","battery","temperature","vibration","motor_current","navigation_errors","health_score","status"]].copy();risk["risk"]=100-risk["health_score"];st.dataframe(risk.round(2),use_container_width=True,hide_index=True,height=500);st.markdown('</div>',unsafe_allow_html=True)
+    risk=latest[["robot_id","battery","temperature","vibration","motor_current","navigation_errors","health_score","status"]].copy();risk["risk"]=100-risk["health_score"];white_data_table(risk.round(2),500);st.markdown('</div>',unsafe_allow_html=True)
 
 elif st.session_state.active_page == "Route Optimization":
     st.markdown('<div class="section-title">Route Optimization</div><div class="section-sub">AI task allocation with live backend recommendation and shortest-path routing.</div>',unsafe_allow_html=True)
-    target=st.selectbox("Target Station",["P1","P2","P3"],index=2,key="route_target")
+    target=st.radio("Target Station",["P1","P2","P3"],index=2,key="route_target",horizontal=True)
     if st.button("⚡ Run AI Allocation",key="route_run"):
         try:
             resp=requests.get("https://warebot-ai.onrender.com/mqtt/allocate-task",timeout=10)
@@ -920,9 +1475,9 @@ elif st.session_state.active_page == "Inventory & Orders":
     inv=get_inventory();orders=get_orders()
     a,b=st.columns(2)
     with a:
-        st.markdown('<div class="panel"><div class="panel-title">Inventory</div>',unsafe_allow_html=True);st.dataframe(inv,use_container_width=True,hide_index=True,height=500);st.markdown('</div>',unsafe_allow_html=True)
+        st.markdown('<div class="panel"><div class="panel-title">Inventory</div>',unsafe_allow_html=True);white_data_table(inv,500);st.markdown('</div>',unsafe_allow_html=True)
     with b:
-        st.markdown('<div class="panel"><div class="panel-title">Active Orders</div>',unsafe_allow_html=True);st.dataframe(orders,use_container_width=True,hide_index=True,height=500);st.markdown('</div>',unsafe_allow_html=True)
+        st.markdown('<div class="panel"><div class="panel-title">Active Orders</div>',unsafe_allow_html=True);white_data_table(orders,500);st.markdown('</div>',unsafe_allow_html=True)
 
 elif st.session_state.active_page == "Analytics":
     st.markdown('<div class="section-title">Warehouse Analytics</div><div class="section-sub">Fleet, anomaly and operational distribution insights.</div>',unsafe_allow_html=True)
